@@ -69,3 +69,50 @@ func TestServerImpl_OpenGetSet(t *testing.T) {
 		oldCas = cas
 	}
 }
+
+func TestServerImpl_SetContentGeneration(t *testing.T) {
+	// TODO: test skipping writes for old generation
+}
+
+func TestServerImpl_TryAcquire(t *testing.T) {
+	ne := func(m string, e error) {
+		if e != nil {
+			t.Error(m, e)
+		}
+	}
+
+	s, err := New()
+	if err != nil {
+		t.Fatal("Unable to start server:", err)
+	}
+
+	nd, err := s.Open("/foo/bar", false)
+	ne("Error opening /foo/bar:", err)
+
+	ok, err := s.TryAcquire(nd)
+	ne("Error TryAcquire:", err)
+	if !ok {
+		t.Error("Failed to acquire lock with TryAcquire starting from default state")
+	}
+
+	ok, err = s.TryAcquire(nd)
+	ne("Error TryAcquire after TryAcquire:", err)
+	if ok {
+		t.Error("Acquired lock for a second time")
+	}
+
+	err = s.Release(nd)
+	ne("Error Release:", err)
+
+	ok, err = s.TryAcquire(nd)
+	ne("Error TryAcquire after Release:", err)
+	if !ok {
+		t.Error("Failed to acquire lock after Release")
+	}
+
+	ok, err = s.TryAcquire(nd)
+	ne("Error TryAcquire after TryAcquire:", err)
+	if ok {
+		t.Error("Acquired lock for a second time")
+	}
+}

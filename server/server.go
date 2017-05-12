@@ -1,6 +1,10 @@
 package server
 
-import "fmt"
+import "errors"
+
+var (
+	ErrInvalidNodeDescriptor = errors.New("Invalid node descriptor")
+)
 
 type serverImpl struct {
 	nodes *nodeInfoMap
@@ -24,10 +28,41 @@ func (s *serverImpl) Open(path string, readOnly bool) (NodeDescriptor, error) {
 	return NodeDescriptor{descriptor: path}, nil
 }
 
+func (s *serverImpl) Acquire(nd NodeDescriptor) error {
+	ni := s.nodes.GetNode(nd.descriptor)
+	if ni == nil {
+		return ErrInvalidNodeDescriptor
+	}
+
+	ni.Acquire()
+
+	return nil
+}
+
+func (s *serverImpl) TryAcquire(nd NodeDescriptor) (bool, error) {
+	ni := s.nodes.GetNode(nd.descriptor)
+	if ni == nil {
+		return false, ErrInvalidNodeDescriptor
+	}
+
+	return ni.TryAcquire(), nil
+}
+
+func (s *serverImpl) Release(nd NodeDescriptor) error {
+	ni := s.nodes.GetNode(nd.descriptor)
+	if ni == nil {
+		return ErrInvalidNodeDescriptor
+	}
+
+	ni.Release()
+
+	return nil
+}
+
 func (s *serverImpl) GetContentAndStat(nd NodeDescriptor) (NodeContentAndStat, error) {
 	ni := s.nodes.GetNode(nd.descriptor)
 	if ni == nil {
-		return NodeContentAndStat{}, fmt.Errorf("Node %#v does not exist", nd.descriptor)
+		return NodeContentAndStat{}, ErrInvalidNodeDescriptor
 	}
 
 	content, lastModified, generation := ni.GetContent()
@@ -44,7 +79,7 @@ func (s *serverImpl) GetContentAndStat(nd NodeDescriptor) (NodeContentAndStat, e
 func (s *serverImpl) GetStat(nd NodeDescriptor) (NodeStat, error) {
 	ni := s.nodes.GetNode(nd.descriptor)
 	if ni == nil {
-		return NodeStat{}, fmt.Errorf("Node %#v does not exist", nd.descriptor)
+		return NodeStat{}, ErrInvalidNodeDescriptor
 	}
 
 	_, lastModified, generation := ni.GetContent()
@@ -58,7 +93,7 @@ func (s *serverImpl) GetStat(nd NodeDescriptor) (NodeStat, error) {
 func (s *serverImpl) SetContent(nd NodeDescriptor, content string, generation uint64) (bool, error) {
 	ni := s.nodes.GetNode(nd.descriptor)
 	if ni == nil {
-		return false, fmt.Errorf("Node %#v does not exist", nd.descriptor)
+		return false, ErrInvalidNodeDescriptor
 	}
 
 	return ni.SetContent(content, generation), nil

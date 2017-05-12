@@ -10,6 +10,8 @@ type nodeInfo struct {
 	lastModified time.Time
 	generation   uint64
 	lock         sync.RWMutex
+	// TODO: keep track of who locked the node
+	locked bool
 }
 
 func (ni *nodeInfo) GetContent() (string, time.Time, uint64) {
@@ -32,37 +34,29 @@ func (ni *nodeInfo) SetContent(content string, generation uint64) bool {
 	return true
 }
 
-// maps aren't safe for concurrent access, so guard mutations with a RWMutex
-type nodeInfoMap struct {
-	data map[string]*nodeInfo
-	lock sync.RWMutex
+func (ni *nodeInfo) Acquire() {
+	locked := ni.TryAcquire()
+	for !locked {
+		locked = ni.TryAcquire()
+	}
 }
 
-func makeNodeInfoMap() *nodeInfoMap {
-	return &nodeInfoMap{data: make(map[string]*nodeInfo)}
-}
+func (ni *nodeInfo) TryAcquire() bool {
+	ni.lock.Lock()
+	defer ni.lock.Unlock()
 
-func (nim *nodeInfoMap) GetNode(path string) *nodeInfo {
-	nim.lock.RLock()
-	defer nim.lock.RUnlock()
-	return nim.data[path]
-}
-
-func (nim *nodeInfoMap) CreateNode(path string) *nodeInfo {
-	nim.lock.Lock()
-	defer nim.lock.Unlock()
-
-	if _, ok := nim.data[path]; !ok {
-		nim.data[path] = &nodeInfo{}
+	if ni.locked {
+		return false
 	}
 
-	return nim.data[path]
+	ni.locked = true
+	return true
 }
 
-func (nim *nodeInfoMap) GetOrCreateNode(path string) *nodeInfo {
-	if node := nim.GetNode(path); node != nil {
-		return node
-	}
+// TODO: add error checking for whether the caller has the lock
+func (ni *nodeInfo) Release() {
+	ni.lock.Lock()
+	defer ni.lock.Unlock()
 
-	return nim.CreateNode(path)
+	ni.locked = false
 }
