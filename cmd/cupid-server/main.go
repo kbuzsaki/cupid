@@ -9,7 +9,7 @@ import (
 
 func main() {
 	var s server.Server
-	s, err := server.New("localhost:12345")
+	s, err := server.New()
 	if err != nil {
 		log.Printf("error initializing server: %v\n", err)
 	}
