@@ -36,7 +36,9 @@ func TestServerImpl_OpenGetSet(t *testing.T) {
 	if cas.Content != "" {
 		t.Errorf("Default content for new node was %#v, expected empty string\n", cas.Content)
 	}
-	// TODO: check generation and other stat info
+	if cas.Stat.Generation != 0 {
+		t.Error("Generation not initialized to 0")
+	}
 
 	oldCas := cas
 	for _, content := range contents {
