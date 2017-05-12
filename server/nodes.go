@@ -1,17 +1,21 @@
 package server
 
-import "sync"
+import (
+	"sync"
+	"time"
+)
 
 type nodeInfo struct {
-	content    string
-	generation uint64
-	lock       sync.RWMutex
+	content      string
+	lastModified time.Time
+	generation   uint64
+	lock         sync.RWMutex
 }
 
-func (ni *nodeInfo) GetContent() string {
+func (ni *nodeInfo) GetContent() (string, time.Time, uint64) {
 	ni.lock.RLock()
 	defer ni.lock.RUnlock()
-	return ni.content
+	return ni.content, ni.lastModified, ni.generation
 }
 
 func (ni *nodeInfo) SetContent(content string, generation uint64) bool {
@@ -23,6 +27,7 @@ func (ni *nodeInfo) SetContent(content string, generation uint64) bool {
 	}
 
 	ni.content = content
+	ni.lastModified = time.Now()
 	ni.generation += 1
 	return true
 }

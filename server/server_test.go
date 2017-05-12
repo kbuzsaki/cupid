@@ -21,6 +21,8 @@ func TestServerImpl_OpenGetSet(t *testing.T) {
 		}
 	}
 
+	contents := []string{"some content", "dog", "foo bar", "foo bar"}
+
 	s, err := New()
 	if err != nil {
 		t.Fatal("Unable to start server:", err)
@@ -36,15 +38,32 @@ func TestServerImpl_OpenGetSet(t *testing.T) {
 	}
 	// TODO: check generation and other stat info
 
-	ok, err := s.SetContent(nd, "some content", 16)
-	ne("Error SetContent /foo/bar:", err)
-	if !ok {
-		t.Error("Failed write for SetContent")
-	}
+	oldCas := cas
+	for _, content := range contents {
+		ok, err := s.SetContent(nd, content, 16)
+		ne("Error SetContent /foo/bar:", err)
+		if !ok {
+			t.Error("Failed write for SetContent")
+		}
 
-	cas, err = s.GetContentAndStat(nd)
-	ne("Error GetContentAndStat /foo/bar:", err)
-	if cas.Content != "some content" {
-		t.Errorf("Content not set correctly, was %#v, expected \"some content\"\n", cas.Content)
+		cas, err = s.GetContentAndStat(nd)
+		ne("Error GetContentAndStat /foo/bar:", err)
+		if cas.Content != content {
+			t.Errorf("Content not set correctly, was %#v, expected \"some content\"\n", cas.Content)
+		}
+		if !cas.Stat.LastModified.After(oldCas.Stat.LastModified) {
+			t.Error("LastModified not higher for new cas: new:", cas.Stat.LastModified, "old:", oldCas.Stat.LastModified)
+		}
+		if cas.Stat.Generation <= oldCas.Stat.Generation {
+			t.Error("Generation not higher for new cas: new:", cas.Stat.Generation, "old:", oldCas.Stat.Generation)
+		}
+
+		stat, err := s.GetStat(nd)
+		ne("Error GetStat /foo/bar:", err)
+		if cas.Stat != stat {
+			t.Error("GetStat did not equal GetContentAndStat")
+		}
+
+		oldCas = cas
 	}
 }

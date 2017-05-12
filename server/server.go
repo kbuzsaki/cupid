@@ -30,14 +30,29 @@ func (s *serverImpl) GetContentAndStat(nd NodeDescriptor) (NodeContentAndStat, e
 		return NodeContentAndStat{}, fmt.Errorf("Node %#v does not exist", nd.descriptor)
 	}
 
+	content, lastModified, generation := ni.GetContent()
+
 	return NodeContentAndStat{
-		Content: ni.GetContent(),
-		Stat:    NodeStat{},
+		Content: content,
+		Stat: NodeStat{
+			Generation:   generation,
+			LastModified: lastModified,
+		},
 	}, nil
 }
 
 func (s *serverImpl) GetStat(nd NodeDescriptor) (NodeStat, error) {
-	return NodeStat{}, nil
+	ni := s.nodes.GetNode(nd.descriptor)
+	if ni == nil {
+		return NodeStat{}, fmt.Errorf("Node %#v does not exist", nd.descriptor)
+	}
+
+	_, lastModified, generation := ni.GetContent()
+
+	return NodeStat{
+		Generation:   generation,
+		LastModified: lastModified,
+	}, nil
 }
 
 func (s *serverImpl) SetContent(nd NodeDescriptor, content string, generation uint64) (bool, error) {
