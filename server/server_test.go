@@ -5,19 +5,72 @@ import (
 	"testing"
 )
 
+// These test functions just immediately delegate to the shared tester functions below
+
 func TestServerImpl_KeepAlive(t *testing.T) {
 	s, err := New()
 	if err != nil {
 		t.Fatal("Unable to start server:", err)
 	}
 
-	err = s.KeepAlive()
+	DoServerTest_KeepAlive(t, s)
+}
+
+func TestServerImpl_OpenGetSet(t *testing.T) {
+	s, err := New()
+	if err != nil {
+		t.Fatal("Unable to start server:", err)
+	}
+
+	DoServerTest_OpenGetSet(t, s)
+}
+
+func TestServerImpl_OpenReadOnly(t *testing.T) {
+	s, err := New()
+	if err != nil {
+		t.Fatal("Unable to start server:", err)
+	}
+
+	DoServerTest_OpenReadOnly(t, s)
+}
+
+func TestServerImpl_SetContentGeneration(t *testing.T) {
+	s, err := New()
+	if err != nil {
+		t.Fatal("Unable to start server:", err)
+	}
+
+	DoServerTest_SetContentGeneration(t, s)
+}
+
+func TestServerImpl_ConcurrentOpen(t *testing.T) {
+	s, err := New()
+	if err != nil {
+		t.Fatal("Unable to start server:", err)
+	}
+
+	DoServerTest_ConcurrentOpen(t, s)
+}
+
+func TestServerImpl_TryAcquire(t *testing.T) {
+	s, err := New()
+	if err != nil {
+		t.Fatal("Unable to start server:", err)
+	}
+
+	DoServerTest_TryAcquire(t, s)
+}
+
+// Actual test implementations below - these are shared for all implementations of server.Server
+
+func DoServerTest_KeepAlive(t *testing.T, s Server) {
+	err := s.KeepAlive()
 	if err != nil {
 		t.Error("KeepAlive failed:", err)
 	}
 }
 
-func TestServerImpl_OpenGetSet(t *testing.T) {
+func DoServerTest_OpenGetSet(t *testing.T, s Server) {
 	ne := func(m string, e error) {
 		if e != nil {
 			t.Error(m, e)
@@ -25,11 +78,6 @@ func TestServerImpl_OpenGetSet(t *testing.T) {
 	}
 
 	contents := []string{"some content", "dog", "foo bar", "foo bar"}
-
-	s, err := New()
-	if err != nil {
-		t.Fatal("Unable to start server:", err)
-	}
 
 	nd, err := s.Open("/foo/bar", false)
 	ne("Error opening /foo/bar:", err)
@@ -73,7 +121,7 @@ func TestServerImpl_OpenGetSet(t *testing.T) {
 	}
 }
 
-func TestServerImpl_OpenReadOnly(t *testing.T) {
+func DoServerTest_OpenReadOnly(t *testing.T, s Server) {
 	ne := func(m string, e error) {
 		if e != nil {
 			t.Error(m, e)
@@ -83,11 +131,6 @@ func TestServerImpl_OpenReadOnly(t *testing.T) {
 		if e == nil {
 			t.Error(m)
 		}
-	}
-
-	s, err := New()
-	if err != nil {
-		t.Fatal("Unable to start server:", err)
 	}
 
 	nd, err := s.Open("/foo/bar", true)
@@ -129,16 +172,11 @@ func TestServerImpl_OpenReadOnly(t *testing.T) {
 	ae("Expected error from Release with read only descriptor", err)
 }
 
-func TestServerImpl_SetContentGeneration(t *testing.T) {
+func DoServerTest_SetContentGeneration(t *testing.T, s Server) {
 	ne := func(m string, e error) {
 		if e != nil {
 			t.Error(m, e)
 		}
-	}
-
-	s, err := New()
-	if err != nil {
-		t.Fatal("Unable to start server:", err)
 	}
 
 	nd, err := s.Open("/foo/bar", false)
@@ -202,16 +240,11 @@ func TestServerImpl_SetContentGeneration(t *testing.T) {
 	}
 }
 
-func TestServerImpl_ConcurrentOpen(t *testing.T) {
+func DoServerTest_ConcurrentOpen(t *testing.T, s Server) {
 	ne := func(m string, e error) {
 		if e != nil {
 			t.Error(m, e)
 		}
-	}
-
-	s, err := New()
-	if err != nil {
-		t.Fatal("Unable to start server:", err)
 	}
 
 	content := "some content"
@@ -268,16 +301,11 @@ func TestServerImpl_ConcurrentOpen(t *testing.T) {
 	childrenDone.Wait()
 }
 
-func TestServerImpl_TryAcquire(t *testing.T) {
+func DoServerTest_TryAcquire(t *testing.T, s Server) {
 	ne := func(m string, e error) {
 		if e != nil {
 			t.Error(m, e)
 		}
-	}
-
-	s, err := New()
-	if err != nil {
-		t.Fatal("Unable to start server:", err)
 	}
 
 	nd, err := s.Open("/foo/bar", false)
