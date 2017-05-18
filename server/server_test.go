@@ -74,7 +74,76 @@ func TestServerImpl_OpenGetSet(t *testing.T) {
 }
 
 func TestServerImpl_SetContentGeneration(t *testing.T) {
-	// TODO: test skipping writes for old generation
+	ne := func(m string, e error) {
+		if e != nil {
+			t.Error(m, e)
+		}
+	}
+
+	s, err := New()
+	if err != nil {
+		t.Fatal("Unable to start server:", err)
+	}
+
+	nd, err := s.Open("/foo/bar", false)
+	ne("Error opening /foo/bar:", err)
+
+	cas, err := s.GetContentAndStat(nd)
+	ne("Error GetContentAndStat /foo/bar:", err)
+	if cas.Content != "" {
+		t.Errorf("Default content for new node was %#v, expected empty string\n", cas.Content)
+	}
+	if cas.Stat.Generation != 0 {
+		t.Error("Generation not initialized to 0")
+	}
+
+	// when a node is first created, any generation value should succeed:
+	ok, err := s.SetContent(nd, "foo", 0)
+	ne("Error SetContent generation 0", err)
+	if !ok {
+		t.Error("Failed initial SetContent with generation 0")
+	}
+
+	// after this the generation should be 1
+	cas, err = s.GetContentAndStat(nd)
+	ne("Error GetContentAndStat after SetContentAndStat", err)
+	if cas.Stat.Generation != 1 {
+		t.Error("Wrong generation number:", cas.Stat.Generation, "expected 1")
+	}
+	if cas.Content != "foo" {
+		t.Errorf("Wrong content %#v, expected \"foo\"", cas.Content)
+	}
+
+	// generation is now 1, so a generation value of 0 should nop
+	ok, err = s.SetContent(nd, "bar", 0)
+	ne("Error SetContent generation 0 second round", err)
+	if ok {
+		t.Error("Erroneously succeeded in setting content when generation was too low")
+	}
+
+	// confirm that previous set was a nop and content is same
+	cas, err = s.GetContentAndStat(nd)
+	ne("Error GetContentAndStat after second SetContent", err)
+	if cas.Content != "foo" {
+		t.Errorf("Wrong content after nop SetContent, was %#v expected \"foo\"", cas.Content)
+	}
+
+	// now do a set with the correct minimum generation value, 1
+	ok, err = s.SetContent(nd, "bar", 1)
+	ne("Error SetContent generation 1", err)
+	if !ok {
+		t.Error("Failed SetContent with generation 1 (high enough that should not nop)")
+	}
+
+	// and confirm that the previous set went through
+	cas, err = s.GetContentAndStat(nd)
+	ne("Error GetContentAndStat after SetContent with generation 1:", err)
+	if cas.Content != "bar" {
+		t.Errorf("Wrong content after SetContent with generation 1, was %#v expected \"bar\"", cas.Content)
+	}
+	if cas.Stat.Generation != 2 {
+		t.Error("Wrong generation number:", cas.Stat.Generation, "expected 2")
+	}
 }
 
 func TestServerImpl_ConcurrentOpen(t *testing.T) {
