@@ -17,7 +17,7 @@ type Server interface {
 }
 
 type NodeDescriptor struct {
-	descriptor string
+	descriptor descriptorKey
 }
 
 type NodeContentAndStat struct {

@@ -3,17 +3,20 @@ package server
 import "errors"
 
 var (
-	ErrInvalidNodeDescriptor = errors.New("Invalid node descriptor")
+	ErrInvalidNodeDescriptor  = errors.New("Invalid node descriptor")
+	ErrReadOnlyNodeDescriptor = errors.New("Write from read-only node descriptor")
 )
 
 type serverImpl struct {
-	nodes *nodeInfoMap
+	nodes       *nodeInfoMap
+	descriptors *nodeDescriptorMap
 }
 
 // TODO: accept a config file instead?
 func New() (Server, error) {
 	return &serverImpl{
-		nodes: makeNodeInfoMap(),
+		nodes:       makeNodeInfoMap(),
+		descriptors: makeNodeDescriptorMap(),
 	}, nil
 }
 
@@ -22,50 +25,57 @@ func (s *serverImpl) KeepAlive() error {
 }
 
 func (s *serverImpl) Open(path string, readOnly bool) (NodeDescriptor, error) {
-	// TODO: actually use readOnly to restrict SetContent
 	// TODO: semantics regarding deletion and whether a descriptor is still valid after deletion
-	s.nodes.GetOrCreateNode(path)
-	return NodeDescriptor{descriptor: path}, nil
+	ni := s.nodes.GetOrCreateNode(path)
+	key := s.descriptors.OpenDescriptor(ni, readOnly)
+	return NodeDescriptor{key}, nil
 }
 
 func (s *serverImpl) Acquire(nd NodeDescriptor) error {
-	ni := s.nodes.GetNode(nd.descriptor)
-	if ni == nil {
+	nid := s.descriptors.GetDescriptor(nd.descriptor)
+	if nid == nil {
 		return ErrInvalidNodeDescriptor
+	} else if nid.readOnly {
+		return ErrReadOnlyNodeDescriptor
 	}
 
-	ni.Acquire()
+	nid.ni.Acquire()
 
 	return nil
 }
 
 func (s *serverImpl) TryAcquire(nd NodeDescriptor) (bool, error) {
-	ni := s.nodes.GetNode(nd.descriptor)
-	if ni == nil {
+	nid := s.descriptors.GetDescriptor(nd.descriptor)
+	if nid == nil {
 		return false, ErrInvalidNodeDescriptor
+	} else if nid.readOnly {
+		return false, ErrReadOnlyNodeDescriptor
 	}
 
-	return ni.TryAcquire(), nil
+	return nid.ni.TryAcquire(), nil
 }
 
+// TODO: prevent releases by an unrelated node descriptor
 func (s *serverImpl) Release(nd NodeDescriptor) error {
-	ni := s.nodes.GetNode(nd.descriptor)
-	if ni == nil {
+	nid := s.descriptors.GetDescriptor(nd.descriptor)
+	if nid == nil {
 		return ErrInvalidNodeDescriptor
+	} else if nid.readOnly {
+		return ErrReadOnlyNodeDescriptor
 	}
 
-	ni.Release()
+	nid.ni.Release()
 
 	return nil
 }
 
 func (s *serverImpl) GetContentAndStat(nd NodeDescriptor) (NodeContentAndStat, error) {
-	ni := s.nodes.GetNode(nd.descriptor)
-	if ni == nil {
+	nid := s.descriptors.GetDescriptor(nd.descriptor)
+	if nid == nil {
 		return NodeContentAndStat{}, ErrInvalidNodeDescriptor
 	}
 
-	content, lastModified, generation := ni.GetContent()
+	content, lastModified, generation := nid.ni.GetContent()
 
 	return NodeContentAndStat{
 		Content: content,
@@ -77,12 +87,12 @@ func (s *serverImpl) GetContentAndStat(nd NodeDescriptor) (NodeContentAndStat, e
 }
 
 func (s *serverImpl) GetStat(nd NodeDescriptor) (NodeStat, error) {
-	ni := s.nodes.GetNode(nd.descriptor)
-	if ni == nil {
+	nid := s.descriptors.GetDescriptor(nd.descriptor)
+	if nid == nil {
 		return NodeStat{}, ErrInvalidNodeDescriptor
 	}
 
-	_, lastModified, generation := ni.GetContent()
+	_, lastModified, generation := nid.ni.GetContent()
 
 	return NodeStat{
 		Generation:   generation,
@@ -91,10 +101,12 @@ func (s *serverImpl) GetStat(nd NodeDescriptor) (NodeStat, error) {
 }
 
 func (s *serverImpl) SetContent(nd NodeDescriptor, content string, generation uint64) (bool, error) {
-	ni := s.nodes.GetNode(nd.descriptor)
-	if ni == nil {
+	nid := s.descriptors.GetDescriptor(nd.descriptor)
+	if nid == nil {
 		return false, ErrInvalidNodeDescriptor
+	} else if nid.readOnly {
+		return false, ErrReadOnlyNodeDescriptor
 	}
 
-	return ni.SetContent(content, generation), nil
+	return nid.ni.SetContent(content, generation), nil
 }

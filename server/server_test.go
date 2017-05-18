@@ -73,6 +73,62 @@ func TestServerImpl_OpenGetSet(t *testing.T) {
 	}
 }
 
+func TestServerImpl_OpenReadOnly(t *testing.T) {
+	ne := func(m string, e error) {
+		if e != nil {
+			t.Error(m, e)
+		}
+	}
+	ae := func(m string, e error) {
+		if e == nil {
+			t.Error(m)
+		}
+	}
+
+	s, err := New()
+	if err != nil {
+		t.Fatal("Unable to start server:", err)
+	}
+
+	nd, err := s.Open("/foo/bar", true)
+	ne("Error opening /foo/bar:", err)
+
+	cas, err := s.GetContentAndStat(nd)
+	ne("Error GetContentAndStat /foo/bar:", err)
+	if cas.Content != "" {
+		t.Errorf("Default content for new node was %#v, expected empty string\n", cas.Content)
+	}
+	if cas.Stat.Generation != 0 {
+		t.Error("Generation not initialized to 0")
+	}
+
+	_, err = s.SetContent(nd, "foo", 16)
+	ae("Expected error from SetContent with read only descriptor", err)
+
+	oldCas := cas
+
+	cas, err = s.GetContentAndStat(nd)
+	ne("Error GetContentAndStat /foo/bar:", err)
+	if cas != oldCas {
+		t.Error("Erroneously modified node from read only descriptor")
+	}
+
+	stat, err := s.GetStat(nd)
+	ne("Error GetStat /foo/bar:", err)
+	if cas.Stat != stat {
+		t.Error("GetStat did not equal GetContentAndStat")
+	}
+
+	err = s.Acquire(nd)
+	ae("Expected error from Acquire with read only descriptor", err)
+
+	_, err = s.TryAcquire(nd)
+	ae("Expected error from TryAcquire with read only descriptor", err)
+
+	err = s.Release(nd)
+	ae("Expected error from Release with read only descriptor", err)
+}
+
 func TestServerImpl_SetContentGeneration(t *testing.T) {
 	ne := func(m string, e error) {
 		if e != nil {
