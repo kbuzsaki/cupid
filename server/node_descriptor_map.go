@@ -1,8 +1,27 @@
 package server
 
-import "sync"
+import (
+	"fmt"
+	"strconv"
+	"sync"
+)
+
+const descriptorKeyBase = 10
 
 type descriptorKey uint64
+
+func (k descriptorKey) Serialize() string {
+	return strconv.FormatUint(uint64(k), descriptorKeyBase)
+}
+
+func DeserializeDescriptorKey(s string) (descriptorKey, error) {
+	n, err := strconv.ParseUint(s, descriptorKeyBase, 0)
+	if err != nil {
+		return 0, fmt.Errorf("Unable to parse serialized descriptor: %v", err)
+	}
+
+	return descriptorKey(n), nil
+}
 
 type nodeDescriptor struct {
 	ni       *nodeInfo

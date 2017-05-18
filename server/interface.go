@@ -20,6 +20,19 @@ type NodeDescriptor struct {
 	descriptor descriptorKey
 }
 
+func (nd NodeDescriptor) Serialize() string {
+	return nd.descriptor.Serialize()
+}
+
+func DeserializeNodeDescriptor(s string) (NodeDescriptor, error) {
+	descriptor, err := DeserializeDescriptorKey(s)
+	if err != nil {
+		return NodeDescriptor{}, err
+	}
+
+	return NodeDescriptor{descriptor}, nil
+}
+
 type NodeContentAndStat struct {
 	Content string
 	Stat    NodeStat
