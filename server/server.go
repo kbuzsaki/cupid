@@ -24,7 +24,7 @@ func (s *serverImpl) KeepAlive() error {
 	return nil
 }
 
-func (s *serverImpl) Open(path string, readOnly bool) (NodeDescriptor, error) {
+func (s *serverImpl) Open(path string, readOnly bool, events EventsConfig) (NodeDescriptor, error) {
 	// TODO: semantics regarding deletion and whether a descriptor is still valid after deletion
 	ni := s.nodes.GetOrCreateNode(path)
 	key := s.descriptors.OpenDescriptor(ni, readOnly)

@@ -12,8 +12,8 @@ func New(addr string) (Client, error) {
 	return &clientImpl{s: nil}, nil
 }
 
-func (cl *clientImpl) Open(path string, readOnly bool) (NodeHandle, error) {
-	nd, err := cl.s.Open(path, readOnly)
+func (cl *clientImpl) Open(path string, readOnly bool, events server.EventsConfig) (NodeHandle, error) {
+	nd, err := cl.s.Open(path, readOnly, events)
 	if err != nil {
 		return nil, err
 	}

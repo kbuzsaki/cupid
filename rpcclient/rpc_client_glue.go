@@ -14,8 +14,8 @@ func (cg *clientGlue) KeepAlive() error {
 	return nil
 }
 
-func (cg *clientGlue) Open(path string, readOnly bool) (server.NodeDescriptor, error) {
-	args := OpenArgs{path, readOnly}
+func (cg *clientGlue) Open(path string, readOnly bool, events server.EventsConfig) (server.NodeDescriptor, error) {
+	args := OpenArgs{path, readOnly, events}
 	nd := ""
 	err := cg.delegate.Open(&args, &nd)
 	if err != nil {

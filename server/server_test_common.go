@@ -21,7 +21,7 @@ func DoServerTest_OpenGetSet(t *testing.T, s Server) {
 
 	contents := []string{"some content", "dog", "foo bar", "foo bar"}
 
-	nd, err := s.Open("/foo/bar", false)
+	nd, err := s.Open("/foo/bar", false, EventsConfig{})
 	ne("Error opening /foo/bar:", err)
 
 	cas, err := s.GetContentAndStat(nd)
@@ -75,7 +75,7 @@ func DoServerTest_OpenReadOnly(t *testing.T, s Server) {
 		}
 	}
 
-	nd, err := s.Open("/foo/bar", true)
+	nd, err := s.Open("/foo/bar", true, EventsConfig{})
 	ne("Error opening /foo/bar:", err)
 
 	cas, err := s.GetContentAndStat(nd)
@@ -121,7 +121,7 @@ func DoServerTest_SetContentGeneration(t *testing.T, s Server) {
 		}
 	}
 
-	nd, err := s.Open("/foo/bar", false)
+	nd, err := s.Open("/foo/bar", false, EventsConfig{})
 	ne("Error opening /foo/bar:", err)
 
 	cas, err := s.GetContentAndStat(nd)
@@ -201,7 +201,7 @@ func DoServerTest_ConcurrentOpen(t *testing.T, s Server) {
 			// wait until all children are created to do concurrent open
 			mainDone1.Wait()
 
-			nd, err := s.Open("/foo/baz", false)
+			nd, err := s.Open("/foo/baz", false, EventsConfig{})
 			ne("Error opening file in child:", err)
 
 			// signal that this child is done and wait until main is done
@@ -228,7 +228,7 @@ func DoServerTest_ConcurrentOpen(t *testing.T, s Server) {
 	childrenDone.Wait()
 
 	// set the content so that all of the children can read it
-	nd, err := s.Open("/foo/baz", false)
+	nd, err := s.Open("/foo/baz", false, EventsConfig{})
 	ne("Error opening file in main:", err)
 
 	ok, err := s.SetContent(nd, content, 10)
@@ -250,7 +250,7 @@ func DoServerTest_TryAcquire(t *testing.T, s Server) {
 		}
 	}
 
-	nd, err := s.Open("/foo/bar", false)
+	nd, err := s.Open("/foo/bar", false, EventsConfig{})
 	ne("Error opening /foo/bar:", err)
 
 	ok, err := s.TryAcquire(nd)

@@ -21,8 +21,9 @@ type LeaseInfo struct {
 }
 
 type OpenArgs struct {
-	Path     string
-	ReadOnly bool
+	Path         string
+	ReadOnly     bool
+	EventsConfig server.EventsConfig
 }
 
 type SetContentArgs struct {
@@ -44,7 +45,7 @@ func (rs *rpcServer) KeepAlive(lease *LeaseInfo, _ *int) error {
 }
 
 func (rs *rpcServer) Open(args *OpenArgs, nd *string) error {
-	descriptor, err := rs.delegate.Open(args.Path, args.ReadOnly)
+	descriptor, err := rs.delegate.Open(args.Path, args.ReadOnly, args.EventsConfig)
 	if err != nil {
 		return err
 	}

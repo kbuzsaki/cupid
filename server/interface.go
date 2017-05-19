@@ -5,7 +5,7 @@ import "time"
 type Server interface {
 	KeepAlive() error
 
-	Open(path string, readOnly bool) (NodeDescriptor, error)
+	Open(path string, readOnly bool, events EventsConfig) (NodeDescriptor, error)
 
 	Acquire(node NodeDescriptor) error
 	TryAcquire(node NodeDescriptor) (bool, error)
@@ -41,4 +41,10 @@ type NodeContentAndStat struct {
 type NodeStat struct {
 	Generation   uint64
 	LastModified time.Time
+}
+
+type EventsConfig struct {
+	ContentModified bool
+	LockInvalidated bool
+	MasterFailed    bool
 }

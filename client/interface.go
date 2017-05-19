@@ -7,7 +7,7 @@ import (
 )
 
 type Client interface {
-	Open(path string, readOnly bool) (NodeHandle, error)
+	Open(path string, readOnly bool, events server.EventsConfig) (NodeHandle, error)
 }
 
 type Locker interface {
