@@ -1,9 +1,13 @@
 package client
 
-import "io"
+import (
+	"io"
+
+	"github.com/kbuzsaki/cupid/server"
+)
 
 type Client interface {
-	Open(path string) (NodeHandle, error)
+	Open(path string, readOnly bool) (NodeHandle, error)
 }
 
 type Locker interface {
@@ -13,18 +17,14 @@ type Locker interface {
 }
 
 type File interface {
-	GetContentsAndStat() error
-	GetStat() error
-	SetContents(contents string) error
-}
-
-type Directory interface {
+	GetContentAndStat() (server.NodeContentAndStat, error)
+	GetStat() (server.NodeStat, error)
+	SetContent(contents string, generation uint64) (bool, error)
 }
 
 type NodeHandle interface {
 	io.Closer
 	Locker
 	File
-	Directory
 	Delete() error
 }

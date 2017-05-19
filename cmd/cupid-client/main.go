@@ -8,13 +8,10 @@ import (
 )
 
 func main() {
-	var cl client.Client
-	cl, err := client.New("localhost:12345")
+	_, err := client.New("localhost:12345")
 	if err != nil {
 		log.Printf("error initializing client: %v\n", err)
 	}
-
-	_, _ = cl.Open("/foo/bar")
 
 	fmt.Println("Hello, client")
 }
