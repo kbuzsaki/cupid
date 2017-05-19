@@ -8,6 +8,7 @@ rall:
 
 fmt:
 	gofmt -s -w -l .
+	goimports -w .
  
 test:
 	go test ./...

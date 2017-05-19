@@ -1,0 +1,114 @@
+package rpcclient
+
+import (
+	"net/rpc"
+	"sync"
+
+	"github.com/kbuzsaki/cupid/server"
+)
+
+var (
+	lock = sync.Mutex{}
+	pool = make(map[string]*rpc.Client)
+)
+
+type client struct {
+	addr string
+}
+
+func NewClient(addr string) RPCServer {
+	return &client{addr}
+}
+
+func connAlive(conn *rpc.Client) bool {
+	return conn.Call("Cupid.KeepAlive", nil, nil) == nil
+}
+
+func (cl *client) getConn() (*rpc.Client, error) {
+	lock.Lock()
+	defer lock.Unlock()
+
+	if client, ok := pool[cl.addr]; ok && connAlive(client) {
+		return client, nil
+	}
+
+	client, err := rpc.Dial("tcp", cl.addr)
+	if err != nil {
+		return nil, err
+	}
+
+	pool[cl.addr] = client
+	return client, nil
+}
+
+func (cl *client) KeepAlive(lease *LeaseInfo, _ *int) error {
+	conn, err := cl.getConn()
+	if err != nil {
+		return err
+	}
+
+	return conn.Call("Cupid.KeepAlive", lease, nil)
+}
+
+func (cl *client) Open(args *OpenArgs, nd *string) error {
+	conn, err := cl.getConn()
+	if err != nil {
+		return err
+	}
+
+	return conn.Call("Cupid.Open", args, nd)
+}
+
+func (cl *client) Acquire(node string, _ *int) error {
+	conn, err := cl.getConn()
+	if err != nil {
+		return err
+	}
+
+	return conn.Call("Cupid.Acquire", node, nil)
+}
+
+func (cl *client) TryAcquire(node string, success *bool) error {
+	conn, err := cl.getConn()
+	if err != nil {
+		return err
+	}
+
+	return conn.Call("Cupid.TryAcquire", node, success)
+}
+
+func (cl *client) Release(node string, _ *int) error {
+	conn, err := cl.getConn()
+	if err != nil {
+		return err
+	}
+
+	return conn.Call("Cupid.Release", node, nil)
+}
+
+func (cl *client) GetContentAndStat(node string, cas *server.NodeContentAndStat) error {
+	conn, err := cl.getConn()
+	if err != nil {
+		return err
+	}
+
+	return conn.Call("Cupid.GetContentAndStat", node, cas)
+}
+
+func (cl *client) GetStat(node string, stat *server.NodeStat) error {
+	conn, err := cl.getConn()
+	if err != nil {
+		return err
+	}
+
+	return conn.Call("Cupid.GetStat", node, stat)
+}
+
+func (cl *client) SetContent(args *SetContentArgs, success *bool) error {
+	conn, err := cl.getConn()
+	if err != nil {
+		return err
+	}
+
+	return conn.Call("Cupid.SetContent", args, success)
+}
