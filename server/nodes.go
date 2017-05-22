@@ -74,3 +74,10 @@ func (ni *nodeInfo) Release(unlocker *nodeDescriptor) error {
 
 	return nil
 }
+
+func (ni *nodeInfo) OwnedBy(nid *nodeDescriptor) bool {
+	ni.lock.RLock()
+	defer ni.lock.RUnlock()
+
+	return ni.locker == nid
+}

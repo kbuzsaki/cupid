@@ -6,9 +6,50 @@ import (
 )
 
 func DoServerTest_KeepAlive(t *testing.T, s Server) {
-	err := s.KeepAlive()
-	if err != nil {
-		t.Error("KeepAlive failed:", err)
+	ne := func(m string, e error) {
+		if e != nil {
+			t.Error(m, e)
+		}
+	}
+
+	events, err := s.KeepAlive(LeaseInfo{})
+	ne("KeepAlive with Empty LeaseInfo", err)
+	if len(events) != 0 {
+		t.Error("Got events, expected none: ", events)
+	}
+
+	// test with LeaseInfo that claims to have a lock we don't have
+	nd, err := s.Open("/foo/bar", false, EventsConfig{})
+	ne("Error opening /foo/bar:", err)
+
+	// expect to get lock invalidation event
+	bogusLeaseInfo := LeaseInfo{[]NodeDescriptor{nd}}
+	events, err = s.KeepAlive(bogusLeaseInfo)
+	ne("KeepAlive with bogus LeaseInfo", err)
+	if len(events) != 1 {
+		t.Error("Got incorrect number of events, expected 1: ", events)
+	} else {
+		if event, ok := events[0].(LockInvalidationEvent); !ok {
+			t.Error("Expected LockInvalidationEvent, got:", events[0])
+		} else {
+			if event.Descriptor != nd {
+				t.Error("Got wrong descriptor, expected:", nd, ", was:", event.Descriptor)
+			}
+		}
+	}
+
+	// test case where we do have a lock
+	ok, err := s.TryAcquire(nd)
+	ne("TryAcquire", err)
+	if !ok {
+		t.Error("Failed to acquire lock")
+	}
+
+	goodLeaseInfo := LeaseInfo{[]NodeDescriptor{nd}}
+	events, err = s.KeepAlive(goodLeaseInfo)
+	ne("KeepAlive with good LeaseInfo", err)
+	if len(events) != 0 {
+		t.Error("Got events with good LeaseInfo, expected none: ", events)
 	}
 }
 

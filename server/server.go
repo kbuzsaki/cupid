@@ -20,8 +20,27 @@ func New() (Server, error) {
 	}, nil
 }
 
-func (s *serverImpl) KeepAlive() error {
-	return nil
+func (s *serverImpl) KeepAlive(li LeaseInfo) ([]Event, error) {
+	// check if you own all the locks you think you own
+	var events []Event
+	for _, nd := range li.LockedNodes {
+		nid := s.descriptors.GetDescriptor(nd.descriptor)
+		if nid == nil {
+			return nil, ErrInvalidNodeDescriptor
+		}
+
+		if !nid.ni.OwnedBy(nid) {
+			events = append(events, LockInvalidationEvent{nd})
+		}
+	}
+
+	if len(events) > 0 {
+		return events, nil
+	}
+
+	// TODO: sleep here for content events
+
+	return nil, nil
 }
 
 func (s *serverImpl) Open(path string, readOnly bool, events EventsConfig) (NodeDescriptor, error) {

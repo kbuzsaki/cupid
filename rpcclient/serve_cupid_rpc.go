@@ -25,8 +25,6 @@ func ServeCupidRPC(s server.Server, addr string, ready chan bool) {
 		return
 	}
 
-	log.Printf("Cupid Server listening on %#v\n", addr)
-
 	ready <- true
 
 	for {

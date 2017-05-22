@@ -1,11 +1,13 @@
 package rpcclient
 
 import (
+	"errors"
+
 	"github.com/kbuzsaki/cupid/server"
 )
 
 type RPCServer interface {
-	KeepAlive(lease *LeaseInfo, _ *int) error
+	KeepAlive(lease *LeaseInfo, events *[]server.Event) error
 	Open(args *OpenArgs, nd *string) error
 
 	Acquire(node string, _ *int) error
@@ -18,6 +20,7 @@ type RPCServer interface {
 }
 
 type LeaseInfo struct {
+	LockedNodes []string
 }
 
 type OpenArgs struct {
@@ -40,7 +43,27 @@ func NewServer(delegate server.Server) RPCServer {
 	return &rpcServer{delegate}
 }
 
-func (rs *rpcServer) KeepAlive(lease *LeaseInfo, _ *int) error {
+func (rs *rpcServer) KeepAlive(li *LeaseInfo, events *[]server.Event) error {
+
+	leases := server.LeaseInfo{}
+
+	for _, l := range li.LockedNodes {
+		nd, err := server.DeserializeNodeDescriptor(l)
+		if err != nil {
+			return errors.New("Failed to deserialize lease info")
+		}
+
+		leases.LockedNodes = append(leases.LockedNodes, nd)
+
+	}
+
+	tmp_events, err := rs.delegate.KeepAlive(leases)
+
+	if err != nil {
+		return err
+	}
+
+	*events = tmp_events
 	return nil
 }
 

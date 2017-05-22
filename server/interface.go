@@ -3,7 +3,7 @@ package server
 import "time"
 
 type Server interface {
-	KeepAlive() error
+	KeepAlive(li LeaseInfo) ([]Event, error)
 
 	Open(path string, readOnly bool, events EventsConfig) (NodeDescriptor, error)
 
@@ -20,6 +20,21 @@ type NodeDescriptor struct {
 	descriptor descriptorKey
 }
 
+func (nd NodeDescriptor) GobEncode() ([]byte, error) {
+	return []byte(nd.Serialize()), nil
+}
+
+func (ndp *NodeDescriptor) GobDecode(b []byte) error {
+	nd, err := DeserializeNodeDescriptor(string(b))
+	if err != nil {
+		return err
+	}
+
+	*ndp = nd
+
+	return nil
+}
+
 func (nd NodeDescriptor) Serialize() string {
 	return nd.descriptor.Serialize()
 }
@@ -33,6 +48,12 @@ func DeserializeNodeDescriptor(s string) (NodeDescriptor, error) {
 	return NodeDescriptor{descriptor}, nil
 }
 
+// LeaseInfo represents a session and the locks tha a session thinks it holds
+type LeaseInfo struct {
+	// list of locks
+	LockedNodes []NodeDescriptor
+}
+
 type NodeContentAndStat struct {
 	Content string
 	Stat    NodeStat
@@ -41,10 +62,4 @@ type NodeContentAndStat struct {
 type NodeStat struct {
 	Generation   uint64
 	LastModified time.Time
-}
-
-type EventsConfig struct {
-	ContentModified bool
-	LockInvalidated bool
-	MasterFailed    bool
 }

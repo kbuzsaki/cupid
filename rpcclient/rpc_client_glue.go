@@ -10,8 +10,24 @@ func New(addr string) server.Server {
 	return &clientGlue{NewClient(addr)}
 }
 
-func (cg *clientGlue) KeepAlive() error {
-	return nil
+func (cg *clientGlue) KeepAlive(li server.LeaseInfo) ([]server.Event, error) {
+
+	leases := []string{}
+
+	for _, l := range li.LockedNodes {
+		lease := l.Serialize()
+		leases = append(leases, lease)
+	}
+
+	leaseInfo := LeaseInfo{leases}
+	events := []server.Event{}
+	err := cg.delegate.KeepAlive(&leaseInfo, &events)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return events, nil
 }
 
 func (cg *clientGlue) Open(path string, readOnly bool, events server.EventsConfig) (server.NodeDescriptor, error) {
