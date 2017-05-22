@@ -25,7 +25,7 @@ func ServeCupidRPC(s server.Server, addr string, ready chan bool) {
 		return
 	}
 
-	ready <- true
+	go func() { ready <- true }()
 
 	for {
 		conn, err := listener.Accept()

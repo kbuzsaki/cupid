@@ -1,6 +1,9 @@
 package client
 
-import "github.com/kbuzsaki/cupid/server"
+import (
+	"github.com/kbuzsaki/cupid/rpcclient"
+	"github.com/kbuzsaki/cupid/server"
+)
 
 type clientImpl struct {
 	s server.Server
@@ -8,8 +11,12 @@ type clientImpl struct {
 
 // TODO: accept a config file instead?
 func New(addr string) (Client, error) {
-	// TODO: actually instantiate server over rpc transport
-	return &clientImpl{s: nil}, nil
+	s := rpcclient.New(addr)
+	return newFromServer(s)
+}
+
+func newFromServer(s server.Server) (Client, error) {
+	return &clientImpl{s: s}, nil
 }
 
 func (cl *clientImpl) Open(path string, readOnly bool, events server.EventsConfig) (NodeHandle, error) {

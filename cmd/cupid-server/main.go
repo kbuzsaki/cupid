@@ -3,18 +3,42 @@ package main
 import (
 	"log"
 
+	"flag"
+
 	"github.com/kbuzsaki/cupid/rpcclient"
 	"github.com/kbuzsaki/cupid/server"
 )
 
-func main() {
-	var s server.Server
-	s, err := server.New()
+var (
+	addr = ""
+)
 
-	if err != nil {
-		log.Printf("error initializing server: %v\n", err)
+func parseArgs() {
+	index := 0
+	addrp := flag.String("addr", "", "the address to listen on")
+	flag.Parse()
+
+	if *addrp != "" {
+		addr = *addrp
+	} else {
+		addr = flag.Arg(index)
+		index++
 	}
 
+	if addr == "" {
+		log.Fatal("addr required")
+	}
+}
+
+func main() {
+	parseArgs()
+
+	s, err := server.New()
+	if err != nil {
+		log.Fatalf("error initializing server: %v\n", err)
+	}
+
+	log.Println("starting cupid-server on", addr)
 	ready := make(chan bool)
-	rpcclient.ServeCupidRPC(s, "localhost:3000", ready)
+	rpcclient.ServeCupidRPC(s, addr, ready)
 }
