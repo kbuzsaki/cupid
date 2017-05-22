@@ -39,7 +39,7 @@ func (s *serverImpl) Acquire(nd NodeDescriptor) error {
 		return ErrReadOnlyNodeDescriptor
 	}
 
-	nid.ni.Acquire()
+	nid.ni.Acquire(nid)
 
 	return nil
 }
@@ -52,7 +52,7 @@ func (s *serverImpl) TryAcquire(nd NodeDescriptor) (bool, error) {
 		return false, ErrReadOnlyNodeDescriptor
 	}
 
-	return nid.ni.TryAcquire(), nil
+	return nid.ni.TryAcquire(nid), nil
 }
 
 // TODO: prevent releases by an unrelated node descriptor
@@ -64,9 +64,7 @@ func (s *serverImpl) Release(nd NodeDescriptor) error {
 		return ErrReadOnlyNodeDescriptor
 	}
 
-	nid.ni.Release()
-
-	return nil
+	return nid.ni.Release(nid)
 }
 
 func (s *serverImpl) GetContentAndStat(nd NodeDescriptor) (NodeContentAndStat, error) {

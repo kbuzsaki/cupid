@@ -57,3 +57,12 @@ func TestServerImpl_TryAcquire(t *testing.T) {
 
 	DoServerTest_TryAcquire(t, s)
 }
+
+func TestServerImpl_BadRelease(t *testing.T) {
+	s, err := New()
+	if err != nil {
+		t.Fatal("Unable to start server:", err)
+	}
+
+	DoServerTest_BadRelease(t, s)
+}

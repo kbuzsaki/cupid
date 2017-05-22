@@ -152,3 +152,26 @@ func TestRPC_TryAcquire(t *testing.T) {
 
 	server.DoServerTest_TryAcquire(t, cl)
 }
+
+func TestRPC_BadRelease(t *testing.T) {
+	ne := func(m string, e error) {
+		if e != nil {
+			t.Error(m, e)
+		}
+	}
+
+	s, err := server.New()
+	ne("Could not instantiate server", err)
+	addr := randaddr()
+
+	ready := make(chan bool)
+	go ServeCupidRPC(s, addr, ready)
+	v := <-ready
+	if !v {
+		t.Fatal("Could not launch rpc server")
+	}
+
+	cl := New(addr)
+
+	server.DoServerTest_BadRelease(t, cl)
+}

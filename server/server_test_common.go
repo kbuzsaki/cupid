@@ -253,6 +253,11 @@ func DoServerTest_TryAcquire(t *testing.T, s Server) {
 	nd, err := s.Open("/foo/bar", false, EventsConfig{})
 	ne("Error opening /foo/bar:", err)
 
+	err = s.Release(nd)
+	if err == nil {
+		t.Error("Failed to error when releasing a lock not held")
+	}
+
 	ok, err := s.TryAcquire(nd)
 	ne("Error TryAcquire:", err)
 	if !ok {
@@ -278,5 +283,30 @@ func DoServerTest_TryAcquire(t *testing.T, s Server) {
 	ne("Error TryAcquire after TryAcquire:", err)
 	if ok {
 		t.Error("Acquired lock for a second time")
+	}
+}
+
+func DoServerTest_BadRelease(t *testing.T, s Server) {
+	ne := func(m string, e error) {
+		if e != nil {
+			t.Error(m, e)
+		}
+	}
+
+	nd1, err := s.Open("/foo/bar", false, EventsConfig{})
+	ne("Error opening /foo/bar nd1:", err)
+
+	nd2, err := s.Open("/foo/bar", false, EventsConfig{})
+	ne("Error opening /foo/bar nd2:", err)
+
+	ok, err := s.TryAcquire(nd1)
+	ne("Acquiring nd1", err)
+	if !ok {
+		t.Error("Unable to acquire lock")
+	}
+
+	err = s.Release(nd2)
+	if err == nil {
+		t.Error("Erroneously released lock that we do not own")
 	}
 }

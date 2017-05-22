@@ -1,8 +1,13 @@
 package server
 
 import (
+	"errors"
 	"sync"
 	"time"
+)
+
+var (
+	ErrLockNotHeld = errors.New("Attempting to release a lock that is not held")
 )
 
 type nodeInfo struct {
@@ -10,8 +15,7 @@ type nodeInfo struct {
 	lastModified time.Time
 	generation   uint64
 	lock         sync.RWMutex
-	// TODO: keep track of who locked the node
-	locked bool
+	locker       *nodeDescriptor
 }
 
 func (ni *nodeInfo) GetContent() (string, time.Time, uint64) {
@@ -34,29 +38,39 @@ func (ni *nodeInfo) SetContent(content string, generation uint64) bool {
 	return true
 }
 
-func (ni *nodeInfo) Acquire() {
-	locked := ni.TryAcquire()
+func (ni *nodeInfo) Acquire(locker *nodeDescriptor) {
+	locked := ni.TryAcquire(locker)
 	for !locked {
-		locked = ni.TryAcquire()
+		locked = ni.TryAcquire(locker)
 	}
 }
 
-func (ni *nodeInfo) TryAcquire() bool {
+func (ni *nodeInfo) TryAcquire(locker *nodeDescriptor) bool {
 	ni.lock.Lock()
 	defer ni.lock.Unlock()
 
-	if ni.locked {
+	if ni.locker != nil {
 		return false
 	}
 
-	ni.locked = true
+	ni.locker = locker
 	return true
 }
 
 // TODO: add error checking for whether the caller has the lock
-func (ni *nodeInfo) Release() {
+func (ni *nodeInfo) Release(unlocker *nodeDescriptor) error {
 	ni.lock.Lock()
 	defer ni.lock.Unlock()
 
-	ni.locked = false
+	if unlocker == nil {
+		return ErrInvalidNodeDescriptor
+	}
+
+	if ni.locker != unlocker {
+		return ErrLockNotHeld
+	}
+
+	ni.locker = nil
+
+	return nil
 }
