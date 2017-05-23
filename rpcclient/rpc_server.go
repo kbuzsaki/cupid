@@ -8,14 +8,14 @@ import (
 
 type RPCServer interface {
 	KeepAlive(lease *LeaseInfo, events *[]server.Event) error
-	Open(args *OpenArgs, nd *string) error
+	Open(args *OpenArgs, nd *server.NodeDescriptor) error
 
-	Acquire(node string, _ *int) error
-	TryAcquire(node string, success *bool) error
-	Release(node string, _ *int) error
+	Acquire(node server.NodeDescriptor, _ *int) error
+	TryAcquire(node server.NodeDescriptor, success *bool) error
+	Release(node server.NodeDescriptor, _ *int) error
 
-	GetContentAndStat(node string, cas *server.NodeContentAndStat) error
-	GetStat(node string, stat *server.NodeStat) error
+	GetContentAndStat(node server.NodeDescriptor, cas *server.NodeContentAndStat) error
+	GetStat(node server.NodeDescriptor, stat *server.NodeStat) error
 	SetContent(args *SetContentArgs, success *bool) error
 }
 
@@ -30,7 +30,7 @@ type OpenArgs struct {
 }
 
 type SetContentArgs struct {
-	SNode      string
+	SNode        server.NodeDescriptor
 	Content    string
 	Generation uint64
 }
@@ -67,33 +67,22 @@ func (rs *rpcServer) KeepAlive(li *LeaseInfo, events *[]server.Event) error {
 	return nil
 }
 
-func (rs *rpcServer) Open(args *OpenArgs, nd *string) error {
+func (rs *rpcServer) Open(args *OpenArgs, nd *server.NodeDescriptor) error {
 	descriptor, err := rs.delegate.Open(args.Path, args.ReadOnly, args.EventsConfig)
 	if err != nil {
 		return err
 	}
 
-	*nd = descriptor.Serialize()
+	*nd = descriptor
 	return nil
 }
 
-func (rs *rpcServer) Acquire(snd string, _ *int) error {
-	node, err := server.DeserializeNodeDescriptor(snd)
-	if err != nil {
-		return err
-	}
-
-	return rs.delegate.Acquire(node)
+func (rs *rpcServer) Acquire(snd server.NodeDescriptor, _ *int) error {
+	return rs.delegate.Acquire(snd)
 }
 
-func (rs *rpcServer) TryAcquire(snd string, success *bool) error {
-	node, err := server.DeserializeNodeDescriptor(snd)
-	if err != nil {
-		*success = false
-		return err
-	}
-
-	succ, err := rs.delegate.TryAcquire(node)
+func (rs *rpcServer) TryAcquire(snd server.NodeDescriptor, success *bool) error {
+	succ, err := rs.delegate.TryAcquire(snd)
 	if err != nil {
 		*success = false
 		return err
@@ -103,22 +92,12 @@ func (rs *rpcServer) TryAcquire(snd string, success *bool) error {
 	return nil
 }
 
-func (rs *rpcServer) Release(snd string, _ *int) error {
-	node, err := server.DeserializeNodeDescriptor(snd)
-	if err != nil {
-		return err
-	}
-
-	return rs.delegate.Release(node)
+func (rs *rpcServer) Release(snd server.NodeDescriptor, _ *int) error {
+	return rs.delegate.Release(snd)
 }
 
-func (rs *rpcServer) GetContentAndStat(snd string, cas *server.NodeContentAndStat) error {
-	node, err := server.DeserializeNodeDescriptor(snd)
-	if err != nil {
-		return err
-	}
-
-	nodeCas, err := rs.delegate.GetContentAndStat(node)
+func (rs *rpcServer) GetContentAndStat(snd server.NodeDescriptor, cas *server.NodeContentAndStat) error {
+	nodeCas, err := rs.delegate.GetContentAndStat(snd)
 	if err != nil {
 		return err
 	}
@@ -127,13 +106,8 @@ func (rs *rpcServer) GetContentAndStat(snd string, cas *server.NodeContentAndSta
 	return nil
 }
 
-func (rs *rpcServer) GetStat(snd string, stat *server.NodeStat) error {
-	node, err := server.DeserializeNodeDescriptor(snd)
-	if err != nil {
-		return err
-	}
-
-	nodeStat, err := rs.delegate.GetStat(node)
+func (rs *rpcServer) GetStat(snd server.NodeDescriptor, stat *server.NodeStat) error {
+	nodeStat, err := rs.delegate.GetStat(snd)
 	if err != nil {
 		return err
 	}
@@ -143,12 +117,7 @@ func (rs *rpcServer) GetStat(snd string, stat *server.NodeStat) error {
 }
 
 func (rs *rpcServer) SetContent(args *SetContentArgs, success *bool) error {
-	node, err := server.DeserializeNodeDescriptor(args.SNode)
-	if err != nil {
-		return err
-	}
-
-	succ, err := rs.delegate.SetContent(node, args.Content, args.Generation)
+	succ, err := rs.delegate.SetContent(args.SNode, args.Content, args.Generation)
 	if err != nil {
 		*success = false
 		return err

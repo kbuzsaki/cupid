@@ -32,43 +32,43 @@ func (cg *clientGlue) KeepAlive(li server.LeaseInfo) ([]server.Event, error) {
 
 func (cg *clientGlue) Open(path string, readOnly bool, events server.EventsConfig) (server.NodeDescriptor, error) {
 	args := OpenArgs{path, readOnly, events}
-	nd := ""
+	nd := server.NodeDescriptor{}
 	err := cg.delegate.Open(&args, &nd)
 	if err != nil {
 		return server.NodeDescriptor{}, err
 	}
 
-	return server.DeserializeNodeDescriptor(nd)
+	return nd, nil
 }
 
 func (cg *clientGlue) Acquire(node server.NodeDescriptor) error {
-	return cg.delegate.Acquire(node.Serialize(), nil)
+	return cg.delegate.Acquire(node, nil)
 }
 
 func (cg *clientGlue) TryAcquire(node server.NodeDescriptor) (bool, error) {
 	ok := false
-	err := cg.delegate.TryAcquire(node.Serialize(), &ok)
+	err := cg.delegate.TryAcquire(node, &ok)
 	return ok, err
 }
 
 func (cg *clientGlue) Release(node server.NodeDescriptor) error {
-	return cg.delegate.Release(node.Serialize(), nil)
+	return cg.delegate.Release(node, nil)
 }
 
 func (cg *clientGlue) GetContentAndStat(node server.NodeDescriptor) (server.NodeContentAndStat, error) {
 	cas := server.NodeContentAndStat{}
-	err := cg.delegate.GetContentAndStat(node.Serialize(), &cas)
+	err := cg.delegate.GetContentAndStat(node, &cas)
 	return cas, err
 }
 
 func (cg *clientGlue) GetStat(node server.NodeDescriptor) (server.NodeStat, error) {
 	stat := server.NodeStat{}
-	err := cg.delegate.GetStat(node.Serialize(), &stat)
+	err := cg.delegate.GetStat(node, &stat)
 	return stat, err
 }
 
 func (cg *clientGlue) SetContent(node server.NodeDescriptor, content string, generation uint64) (bool, error) {
-	setContentArgs := SetContentArgs{node.Serialize(), content, generation}
+	setContentArgs := SetContentArgs{node, content, generation}
 	ok := false
 	err := cg.delegate.SetContent(&setContentArgs, &ok)
 	return ok, err

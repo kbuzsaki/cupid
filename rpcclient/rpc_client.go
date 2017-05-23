@@ -50,7 +50,7 @@ func (cl *client) KeepAlive(lease *LeaseInfo, events *[]server.Event) error {
 	return conn.Call("Cupid.KeepAlive", lease, events)
 }
 
-func (cl *client) Open(args *OpenArgs, nd *string) error {
+func (cl *client) Open(args *OpenArgs, nd *server.NodeDescriptor) error {
 	conn, err := cl.getConn()
 	if err != nil {
 		return err
@@ -59,7 +59,7 @@ func (cl *client) Open(args *OpenArgs, nd *string) error {
 	return conn.Call("Cupid.Open", args, nd)
 }
 
-func (cl *client) Acquire(node string, _ *int) error {
+func (cl *client) Acquire(node server.NodeDescriptor, _ *int) error {
 	conn, err := cl.getConn()
 	if err != nil {
 		return err
@@ -68,7 +68,7 @@ func (cl *client) Acquire(node string, _ *int) error {
 	return conn.Call("Cupid.Acquire", node, nil)
 }
 
-func (cl *client) TryAcquire(node string, success *bool) error {
+func (cl *client) TryAcquire(node server.NodeDescriptor, success *bool) error {
 	conn, err := cl.getConn()
 	if err != nil {
 		return err
@@ -77,7 +77,7 @@ func (cl *client) TryAcquire(node string, success *bool) error {
 	return conn.Call("Cupid.TryAcquire", node, success)
 }
 
-func (cl *client) Release(node string, _ *int) error {
+func (cl *client) Release(node server.NodeDescriptor, _ *int) error {
 	conn, err := cl.getConn()
 	if err != nil {
 		return err
@@ -86,7 +86,7 @@ func (cl *client) Release(node string, _ *int) error {
 	return conn.Call("Cupid.Release", node, nil)
 }
 
-func (cl *client) GetContentAndStat(node string, cas *server.NodeContentAndStat) error {
+func (cl *client) GetContentAndStat(node server.NodeDescriptor, cas *server.NodeContentAndStat) error {
 	conn, err := cl.getConn()
 	if err != nil {
 		return err
@@ -95,7 +95,7 @@ func (cl *client) GetContentAndStat(node string, cas *server.NodeContentAndStat)
 	return conn.Call("Cupid.GetContentAndStat", node, cas)
 }
 
-func (cl *client) GetStat(node string, stat *server.NodeStat) error {
+func (cl *client) GetStat(node server.NodeDescriptor, stat *server.NodeStat) error {
 	conn, err := cl.getConn()
 	if err != nil {
 		return err
