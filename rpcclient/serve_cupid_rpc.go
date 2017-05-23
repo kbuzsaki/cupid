@@ -14,13 +14,13 @@ func ServeCupidRPC(s server.Server, addr string, ready chan bool) {
 	err := rpcServer.RegisterName("Cupid", cupidRPC)
 
 	if err != nil {
-		log.Printf("Cannot register cupid rpc %#v", err)
+		log.Println("Cannot register cupid rpc:", err)
 		return
 	}
 
 	listener, err := net.Listen("tcp", addr)
 	if err != nil {
-		log.Printf("RPC server cannot listen: %#v\n", err)
+		log.Println("RPC server cannot listen:", err)
 		ready <- false
 		return
 	}
@@ -30,12 +30,12 @@ func ServeCupidRPC(s server.Server, addr string, ready chan bool) {
 	for {
 		conn, err := listener.Accept()
 		if err != nil {
-			log.Printf("Cannot accept connection: %#v\n", err)
+			log.Println("Cannot accept connection:", err)
 			break
 		}
 
 		go rpcServer.ServeConn(conn)
 	}
 
-	log.Printf("RPC Server exited infinite loop")
+	log.Println("RPC Server exited infinite loop")
 }

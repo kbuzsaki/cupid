@@ -1,6 +1,9 @@
 package server
 
-import "errors"
+import (
+	"errors"
+	"time"
+)
 
 var (
 	ErrInvalidNodeDescriptor  = errors.New("Invalid node descriptor")
@@ -39,6 +42,7 @@ func (s *serverImpl) KeepAlive(li LeaseInfo) ([]Event, error) {
 	}
 
 	// TODO: sleep here for content events
+	time.Sleep(100 * time.Millisecond)
 
 	return nil, nil
 }

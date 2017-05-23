@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"time"
 
 	"github.com/kbuzsaki/cupid/client"
 	"github.com/kbuzsaki/cupid/server"
@@ -45,7 +46,7 @@ func parseArgs() {
 		log.Fatal("address required")
 	} else if command == "" {
 		log.Fatal("command required")
-	} else if path == "" {
+	} else if command != "wait" && path == "" {
 		log.Fatal("path required")
 	}
 }
@@ -81,6 +82,8 @@ func main() {
 		if !ok {
 			fmt.Println("set no-oped due to generation")
 		}
+	case "wait":
+		time.Sleep(10 * time.Second)
 	default:
 		fmt.Printf("Unrecognized command %#v\n", command)
 	}

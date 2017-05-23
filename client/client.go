@@ -1,8 +1,16 @@
 package client
 
 import (
+	"fmt"
+	"log"
+	"time"
+
 	"github.com/kbuzsaki/cupid/rpcclient"
 	"github.com/kbuzsaki/cupid/server"
+)
+
+const (
+	minimumKeepAliveDelay = 100 * time.Millisecond
 )
 
 type clientImpl struct {
@@ -16,7 +24,34 @@ func New(addr string) (Client, error) {
 }
 
 func newFromServer(s server.Server) (Client, error) {
-	return &clientImpl{s: s}, nil
+	cl := &clientImpl{s: s}
+	go cl.keepAlive()
+	return cl, nil
+}
+
+// background does background KeepAlive processing in a goroutine
+func (cl *clientImpl) keepAlive() {
+	for {
+		before := time.Now()
+
+		events, err := cl.s.KeepAlive(server.LeaseInfo{})
+		if err != nil {
+			log.Println("KeepAlive error:", err)
+		}
+
+		if len(events) > 0 {
+			fmt.Println("events:", events)
+			// TODO: pass events to callback / goroutine / whatever
+			// TODO: cache invalidation
+		}
+
+		// before looping around, make sure that it's been at least the minimum amount of time
+		// before we start another KeepAlive
+		duration := time.Since(before)
+		if duration < minimumKeepAliveDelay {
+			time.Sleep(minimumKeepAliveDelay - duration)
+		}
+	}
 }
 
 func (cl *clientImpl) Open(path string, readOnly bool, events server.EventsConfig) (NodeHandle, error) {
