@@ -10,7 +10,8 @@ import (
 )
 
 const (
-	minimumKeepAliveDelay = 100 * time.Millisecond
+	minimumKeepAliveDelay  = 100 * time.Millisecond
+	connectionErrorBackoff = 5 * time.Second
 )
 
 type clientImpl struct {
@@ -37,6 +38,7 @@ func (cl *clientImpl) keepAlive() {
 		events, err := cl.s.KeepAlive(server.LeaseInfo{})
 		if err != nil {
 			log.Println("KeepAlive error:", err)
+			time.Sleep(connectionErrorBackoff)
 		}
 
 		if len(events) > 0 {

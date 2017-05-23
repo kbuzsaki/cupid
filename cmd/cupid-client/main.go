@@ -6,6 +6,12 @@ import (
 	"log"
 	"time"
 
+	"bufio"
+	"os"
+	"strings"
+
+	"strconv"
+
 	"github.com/kbuzsaki/cupid/client"
 	"github.com/kbuzsaki/cupid/server"
 )
@@ -16,75 +22,255 @@ var (
 	path       = ""
 	value      = ""
 	generation = uint64(0)
+	cl         client.Client
+	handles    = map[string]client.NodeHandle{}
 )
 
-func parseArgs() {
-	index := 0
+const (
+	cmdHelp = "Command List:\n" +
+		"\tget <path>\n" +
+		"\tset <path> <value> <generation>" +
+		"\tlock <name>" +
+		"\ttrylock <name>" +
+		"\tunlock <name>"
+	prompt = "> "
+)
+
+func parseArgs() []string {
 	addrp := flag.String("addr", "", "the address to connect to")
-	generationp := flag.Uint64("gen", 0, "the generation number to restrict a set to")
 	flag.Parse()
 
-	if *addrp != "" {
-		addr = *addrp
+	if *addrp == "" {
+		log.Fatal("Address is required")
+	}
+
+	addr = *addrp
+
+	args := flag.Args()
+
+	if len(args) >= 1 {
+		command = args[0]
+		return args[1:]
+	}
+
+	return args
+
+}
+
+func maybePrintHelp(ok bool) bool {
+	if !ok {
+		fmt.Println(cmdHelp)
+	}
+
+	return !ok
+}
+
+func parseGet(args []string) bool {
+	if len(args) == 0 {
+		path = ""
 	} else {
-		addr = flag.Arg(index)
-		index++
+		path = args[0]
+		return true
+	}
+	return false
+}
+
+func handleGet(args []string) bool {
+	if maybePrintHelp(parseGet(args)) {
+		return false
 	}
 
-	command = flag.Arg(index)
-	index++
-
-	path = flag.Arg(index)
-	index++
-
-	value = flag.Arg(index)
-	index++
-
-	generation = *generationp
-
-	if addr == "" {
-		log.Fatal("address required")
-	} else if command == "" {
-		log.Fatal("command required")
-	} else if command != "wait" && path == "" {
-		log.Fatal("path required")
+	nh, err := cl.Open(path, true, server.EventsConfig{})
+	if err != nil {
+		log.Fatalf("get open error:", err)
 	}
+	cas, err := nh.GetContentAndStat()
+	if err != nil {
+		log.Fatalf("get error:", err)
+	}
+
+	//Maybe we want this switched on a flag?
+	fmt.Printf("Generation: %v\n", cas.Stat.Generation)
+	fmt.Println(cas.Content)
+
+	return true
+}
+
+func parseSet(args []string) bool {
+	if len(args) == 0 {
+		path = ""
+	}
+
+	//check if generation is well formed before messing with path and value
+	if len(args) >= 3 {
+		gen, err := strconv.ParseUint(args[2], 10, 64)
+		if err != nil {
+			fmt.Println("Generation expected to be a number")
+			return false
+		}
+		generation = gen
+	}
+
+	//generation was good so now parse path and value
+	if len(args) >= 2 {
+		path = args[0]
+		value = args[1]
+
+		return true
+	}
+
+	return false
+}
+
+func handleSet(args []string) bool {
+	if maybePrintHelp(parseSet(args)) {
+		return true
+	}
+
+	nh, err := cl.Open(path, false, server.EventsConfig{})
+	if err != nil {
+		log.Fatalf("set open error:", err)
+	}
+	ok, err := nh.SetContent(value, generation)
+	if err != nil {
+		log.Fatalf("set error:", err)
+	}
+	if !ok {
+		fmt.Println("set no-oped due to generation")
+	}
+
+	return true
+}
+
+func handleLock(args []string) bool {
+	if maybePrintHelp(parseGet(args)) {
+		return true
+	}
+
+	nh, err := cl.Open(path, false, server.EventsConfig{})
+	if err != nil {
+		log.Fatalf("lock open error:\n", err)
+	}
+
+	err = nh.Acquire()
+	handles[path] = nh
+	if err != nil {
+		log.Fatalf("lock error: %v\n", err)
+	}
+
+	return true
+}
+
+func handleUnlock(args []string) bool {
+	if maybePrintHelp(parseGet(args)) {
+		return true
+	}
+
+	nh, ok := handles[path]
+	if !ok {
+		fmt.Println("Invalid lock name provided: %#v\n", path)
+	}
+
+	err := nh.Release()
+	if err != nil {
+		log.Fatalf("lock release error: %v\n", err)
+	}
+
+	return true
+}
+
+func handleTryLock(args []string) bool {
+	if maybePrintHelp(parseGet(args)) {
+		return true
+	}
+
+	nh, err := cl.Open(path, false, server.EventsConfig{})
+	if err != nil {
+		log.Fatalf("Try Lock open error:%v\n", err)
+	}
+
+	succ, e := nh.TryAcquire()
+	if e != nil {
+		log.Fatalf("try lock error:%v\n", e)
+	}
+
+	if succ {
+		fmt.Println("Acquired Lock")
+	} else {
+		fmt.Println("Failed to Acquire Lock")
+	}
+
+	return true
+}
+
+func runCmd(args []string) bool {
+
+	switch command {
+	case "get":
+		return handleGet(args)
+	case "lock":
+		return handleLock(args)
+	case "unlock":
+		return handleUnlock(args)
+	case "set":
+		return handleSet(args)
+	case "trylock":
+		return handleTryLock(args)
+	case "wait":
+		time.Sleep(10 * time.Second)
+		return true
+	case "exit":
+		return false
+	default:
+		fmt.Printf("Unrecognized command %#v\n", command)
+	}
+
+	return false
+}
+
+func runPrompt() {
+	scanner := bufio.NewScanner(os.Stdin)
+	fmt.Print("> ")
+
+	for scanner.Scan() {
+		line := scanner.Text()
+		args := strings.Fields(line)
+
+		if len(args) > 0 {
+			command = args[0]
+			if len(args) > 0 {
+				args = args[1:]
+			}
+
+			if !runCmd(args) {
+				break
+			}
+
+		}
+		fmt.Print("> ")
+	}
+
+	err := scanner.Err()
+	if err != nil {
+		panic(err)
+	}
+
 }
 
 func main() {
-	parseArgs()
+	args := parseArgs()
 
-	cl, err := client.New(addr)
+	tmp_cl, err := client.New(addr)
+	cl = tmp_cl
+
 	if err != nil {
 		log.Fatalf("error initializing client: %v\n", err)
 	}
 
-	switch command {
-	case "get":
-		nh, err := cl.Open(path, true, server.EventsConfig{})
-		if err != nil {
-			log.Fatal("get open error:", err)
-		}
-		cas, err := nh.GetContentAndStat()
-		if err != nil {
-			log.Fatal("get error:", err)
-		}
-		fmt.Println(cas.Content)
-	case "set":
-		nh, err := cl.Open(path, false, server.EventsConfig{})
-		if err != nil {
-			log.Fatal("set open error:", err)
-		}
-		ok, err := nh.SetContent(value, generation)
-		if err != nil {
-			log.Fatal("set error:", err)
-		}
-		if !ok {
-			fmt.Println("set no-oped due to generation")
-		}
-	case "wait":
-		time.Sleep(10 * time.Second)
-	default:
-		fmt.Printf("Unrecognized command %#v\n", command)
+	if command == "" {
+		runPrompt()
+	} else {
+		runCmd(args)
 	}
+
 }

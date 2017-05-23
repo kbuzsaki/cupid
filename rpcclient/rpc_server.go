@@ -30,7 +30,7 @@ type OpenArgs struct {
 }
 
 type SetContentArgs struct {
-	SNode        server.NodeDescriptor
+	SNode      server.NodeDescriptor
 	Content    string
 	Generation uint64
 }
