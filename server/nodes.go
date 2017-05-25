@@ -2,8 +2,13 @@ package server
 
 import (
 	"errors"
+	"log"
 	"sync"
 	"time"
+)
+
+const (
+	timeoutThreshold = 3 * time.Second
 )
 
 var (
@@ -16,6 +21,8 @@ type nodeInfo struct {
 	generation   uint64
 	lock         sync.RWMutex
 	locker       *nodeDescriptor
+	keepAlive    bool
+	lastPing     time.Time
 }
 
 func (ni *nodeInfo) GetContent() (string, time.Time, uint64) {
@@ -49,11 +56,15 @@ func (ni *nodeInfo) TryAcquire(locker *nodeDescriptor) bool {
 	ni.lock.Lock()
 	defer ni.lock.Unlock()
 
-	if ni.locker != nil {
+	if ni.locker != nil && (ni.keepAlive || time.Since(ni.lastPing) < timeoutThreshold) {
+		log.Println("aborting try acquire: ", ni.keepAlive, time.Since(ni.lastPing))
 		return false
 	}
+	log.Println("taking the lock from:", ni.locker, ni.keepAlive, time.Since(ni.lastPing))
 
 	ni.locker = locker
+	ni.lastPing = time.Now()
+
 	return true
 }
 
@@ -80,4 +91,18 @@ func (ni *nodeInfo) OwnedBy(nid *nodeDescriptor) bool {
 	defer ni.lock.RUnlock()
 
 	return ni.locker == nid
+}
+
+func (ni *nodeInfo) EnterKeepAlive() {
+	ni.lock.Lock()
+	defer ni.lock.Unlock()
+
+	ni.keepAlive = true
+}
+func (ni *nodeInfo) ExitKeepAlive() {
+	ni.lock.Lock()
+	defer ni.lock.Unlock()
+
+	ni.keepAlive = false
+	ni.lastPing = time.Now()
 }

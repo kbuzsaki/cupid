@@ -3,7 +3,7 @@ package server
 import "time"
 
 type Server interface {
-	KeepAlive(li LeaseInfo) ([]Event, error)
+	KeepAlive(li LeaseInfo, eis []EventInfo) ([]Event, error)
 
 	Open(path string, readOnly bool, events EventsConfig) (NodeDescriptor, error)
 
@@ -52,6 +52,12 @@ func DeserializeNodeDescriptor(s string) (NodeDescriptor, error) {
 type LeaseInfo struct {
 	// list of locks
 	LockedNodes []NodeDescriptor
+}
+
+type EventInfo struct {
+	Descriptor NodeDescriptor
+	Generation uint64
+	Push       bool
 }
 
 type NodeContentAndStat struct {

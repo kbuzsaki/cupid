@@ -1,7 +1,6 @@
 package client
 
 import (
-	"fmt"
 	"log"
 	"time"
 
@@ -16,6 +15,12 @@ const (
 
 type clientImpl struct {
 	s server.Server
+
+	eventsIn  chan<- server.Event
+	eventsOut <-chan server.Event
+
+	nodeCache nodeCache
+	locks     lockSet
 }
 
 // TODO: accept a config file instead?
@@ -25,9 +30,44 @@ func New(addr string) (Client, error) {
 }
 
 func newFromServer(s server.Server) (Client, error) {
-	cl := &clientImpl{s: s}
+	eventsIn := make(chan server.Event)
+	eventsOut := make(chan server.Event)
+	go BufferEvents(eventsIn, eventsOut)
+
+	cl := &clientImpl{
+		s:         s,
+		eventsIn:  eventsIn,
+		eventsOut: eventsOut,
+		nodeCache: newNodeCache(),
+		locks:     newLockSet(),
+	}
 	go cl.keepAlive()
+
 	return cl, nil
+}
+
+func (cl *clientImpl) GetEventsOut() <-chan server.Event {
+	return cl.eventsOut
+}
+
+func (cl *clientImpl) handleEvents(events []server.Event) {
+	// do things with those functions
+	for _, rawEvent := range events {
+		switch event := rawEvent.(type) {
+		case server.LockInvalidationEvent:
+			log.Println("handling lock invalidation event:", event)
+			cl.locks.Remove(event.Descriptor)
+		case server.ContentInvalidationEvent:
+			cl.nodeCache.Delete(event.Descriptor)
+		case server.ContentInvalidationPushEvent:
+			cl.nodeCache.Put(event.Descriptor, event.NodeContentAndStat)
+		default:
+			log.Println("Unrecognized event:", rawEvent)
+		}
+
+		//
+		cl.eventsIn <- rawEvent
+	}
 }
 
 // background does background KeepAlive processing in a goroutine
@@ -35,16 +75,17 @@ func (cl *clientImpl) keepAlive() {
 	for {
 		before := time.Now()
 
-		events, err := cl.s.KeepAlive(server.LeaseInfo{})
+		// TODO: make an actual LeaseInfo
+		events, err := cl.s.KeepAlive(cl.locks.GetLeaseInfo(), cl.nodeCache.GetEventInfos())
 		if err != nil {
 			log.Println("KeepAlive error:", err)
 			time.Sleep(connectionErrorBackoff)
 		}
 
 		if len(events) > 0 {
-			fmt.Println("events:", events)
 			// TODO: pass events to callback / goroutine / whatever
 			// TODO: cache invalidation
+			cl.handleEvents(events)
 		}
 
 		// before looping around, make sure that it's been at least the minimum amount of time
@@ -75,19 +116,61 @@ func (nh *nodeHandleImpl) Close() error {
 }
 
 func (nh *nodeHandleImpl) Acquire() error {
-	return nh.cl.s.Acquire(nh.nd)
+	if nh.cl.locks.Contains(nh.nd) {
+		return nil
+	}
+
+	err := nh.cl.s.Acquire(nh.nd)
+	if err != nil {
+		return err
+	}
+
+	nh.cl.locks.Add(nh.nd)
+
+	return nil
 }
 
 func (nh *nodeHandleImpl) TryAcquire() (bool, error) {
-	return nh.cl.s.TryAcquire(nh.nd)
+	if nh.cl.locks.Contains(nh.nd) {
+		return true, nil
+	}
+
+	ok, err := nh.cl.s.TryAcquire(nh.nd)
+	if err != nil {
+		return false, err
+	}
+
+	if ok {
+		nh.cl.locks.Add(nh.nd)
+	}
+
+	return ok, nil
 }
 
 func (nh *nodeHandleImpl) Release() error {
-	return nh.cl.s.Release(nh.nd)
+	err := nh.cl.s.Release(nh.nd)
+	if err != nil {
+		return err
+	}
+
+	nh.cl.locks.Remove(nh.nd)
+
+	return nil
 }
 
 func (nh *nodeHandleImpl) GetContentAndStat() (server.NodeContentAndStat, error) {
-	return nh.cl.s.GetContentAndStat(nh.nd)
+	if cas, ok := nh.cl.nodeCache.Get(nh.nd); ok {
+		return cas, nil
+	}
+
+	cas, err := nh.cl.s.GetContentAndStat(nh.nd)
+	if err != nil {
+		return server.NodeContentAndStat{}, err
+	}
+
+	nh.cl.nodeCache.Put(nh.nd, cas)
+
+	return cas, nil
 }
 
 func (nh *nodeHandleImpl) GetStat() (server.NodeStat, error) {

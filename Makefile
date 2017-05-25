@@ -1,4 +1,4 @@
-.PHONY: all rall fmt test
+.PHONY: all rall fmt test mocks
 
 all:
 	go install ./... github.com/kbuzsaki/cupid/...
@@ -11,4 +11,8 @@ fmt:
 	goimports -w .
  
 test:
-	go test ./...
+	go test -race ./...
+
+mocks:
+	rm -rf mocks
+	cd server && mockery -name=Server && mv mocks ..

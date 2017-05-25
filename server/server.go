@@ -5,6 +5,10 @@ import (
 	"time"
 )
 
+const (
+	keepAliveSleep = 1 * time.Second
+)
+
 var (
 	ErrInvalidNodeDescriptor  = errors.New("Invalid node descriptor")
 	ErrReadOnlyNodeDescriptor = errors.New("Write from read-only node descriptor")
@@ -23,7 +27,15 @@ func New() (Server, error) {
 	}, nil
 }
 
-func (s *serverImpl) KeepAlive(li LeaseInfo) ([]Event, error) {
+func (s *serverImpl) KeepAlive(li LeaseInfo, eis []EventInfo) ([]Event, error) {
+	defer func() {
+		for _, nd := range li.LockedNodes {
+			nid := s.descriptors.GetDescriptor(nd.descriptor)
+			if nid != nil && nid.ni.OwnedBy(nid) {
+				nid.ni.ExitKeepAlive()
+			}
+		}
+	}()
 	// check if you own all the locks you think you own
 	var events []Event
 	for _, nd := range li.LockedNodes {
@@ -34,6 +46,8 @@ func (s *serverImpl) KeepAlive(li LeaseInfo) ([]Event, error) {
 
 		if !nid.ni.OwnedBy(nid) {
 			events = append(events, LockInvalidationEvent{nd})
+		} else {
+			nid.ni.EnterKeepAlive()
 		}
 	}
 
@@ -41,10 +55,26 @@ func (s *serverImpl) KeepAlive(li LeaseInfo) ([]Event, error) {
 		return events, nil
 	}
 
-	// TODO: sleep here for content events
-	time.Sleep(100 * time.Millisecond)
+	// TODO: maybe wake up early when events happen?
+	time.Sleep(keepAliveSleep)
 
-	return nil, nil
+	for _, ei := range eis {
+		// TODO: maybe check nd validity earlier so that the error doesn't wait a second before being sent
+		cas, err := s.GetContentAndStat(ei.Descriptor)
+		if err != nil {
+			return nil, err
+		}
+
+		if cas.Stat.Generation > ei.Generation {
+			if ei.Push {
+				events = append(events, ContentInvalidationPushEvent{ei.Descriptor, cas})
+			} else {
+				events = append(events, ContentInvalidationEvent{ei.Descriptor})
+			}
+		}
+	}
+
+	return events, nil
 }
 
 func (s *serverImpl) Open(path string, readOnly bool, events EventsConfig) (NodeDescriptor, error) {

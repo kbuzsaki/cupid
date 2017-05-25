@@ -8,6 +8,7 @@ import (
 
 type Client interface {
 	Open(path string, readOnly bool, events server.EventsConfig) (NodeHandle, error)
+	GetEventsOut() <-chan server.Event
 }
 
 type Locker interface {

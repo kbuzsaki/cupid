@@ -41,13 +41,13 @@ func (cl *client) getConn() (*rpc.Client, error) {
 	return client, nil
 }
 
-func (cl *client) KeepAlive(lease *LeaseInfo, events *[]server.Event) error {
+func (cl *client) KeepAlive(args *KeepAliveArgs, events *[]server.Event) error {
 	conn, err := cl.getConn()
 	if err != nil {
 		return err
 	}
 
-	return conn.Call("Cupid.KeepAlive", lease, events)
+	return conn.Call("Cupid.KeepAlive", args, events)
 }
 
 func (cl *client) Open(args *OpenArgs, nd *server.NodeDescriptor) error {

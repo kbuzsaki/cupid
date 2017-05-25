@@ -18,6 +18,7 @@ import (
 
 var (
 	addr       = ""
+	debug      = false
 	command    = ""
 	path       = ""
 	value      = ""
@@ -38,6 +39,7 @@ const (
 
 func parseArgs() []string {
 	addrp := flag.String("addr", "", "the address to connect to")
+	debugp := flag.Bool("debug", false, "whether to print event information")
 	flag.Parse()
 
 	if *addrp == "" {
@@ -45,6 +47,7 @@ func parseArgs() []string {
 	}
 
 	addr = *addrp
+	debug = *debugp
 
 	args := flag.Args()
 
@@ -230,7 +233,7 @@ func runCmd(args []string) bool {
 
 func runPrompt() {
 	scanner := bufio.NewScanner(os.Stdin)
-	fmt.Print("> ")
+	fmt.Print(prompt)
 
 	for scanner.Scan() {
 		line := scanner.Text()
@@ -247,7 +250,7 @@ func runPrompt() {
 			}
 
 		}
-		fmt.Print("> ")
+		fmt.Print(prompt)
 	}
 
 	err := scanner.Err()
@@ -257,14 +260,33 @@ func runPrompt() {
 
 }
 
+func printEvents(in <-chan server.Event) {
+	for rawEvent := range in {
+		switch event := rawEvent.(type) {
+		case server.LockInvalidationEvent:
+			fmt.Println("\nLock Invalidation Event:", event)
+		case server.ContentInvalidationEvent:
+			fmt.Println("\nContent Invalidation Event:", event)
+		case server.ContentInvalidationPushEvent:
+			fmt.Println("\nContent Invalidation Push Event:", event)
+		default:
+			fmt.Println("\nUnrecognized event:", rawEvent)
+		}
+		fmt.Print(prompt)
+	}
+}
+
 func main() {
 	args := parseArgs()
 
 	tmp_cl, err := client.New(addr)
-	cl = tmp_cl
-
 	if err != nil {
 		log.Fatalf("error initializing client: %v\n", err)
+	}
+	cl = tmp_cl
+
+	if debug {
+		go printEvents(cl.GetEventsOut())
 	}
 
 	if command == "" {

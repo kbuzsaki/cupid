@@ -7,7 +7,7 @@ import (
 )
 
 type RPCServer interface {
-	KeepAlive(lease *LeaseInfo, events *[]server.Event) error
+	KeepAlive(args *KeepAliveArgs, events *[]server.Event) error
 	Open(args *OpenArgs, nd *server.NodeDescriptor) error
 
 	Acquire(node server.NodeDescriptor, _ *int) error
@@ -19,8 +19,9 @@ type RPCServer interface {
 	SetContent(args *SetContentArgs, success *bool) error
 }
 
-type LeaseInfo struct {
-	LockedNodes []string
+type KeepAliveArgs struct {
+	LeaseInfo  []string
+	EventsInfo []server.EventInfo
 }
 
 type OpenArgs struct {
@@ -43,11 +44,11 @@ func NewServer(delegate server.Server) RPCServer {
 	return &rpcServer{delegate}
 }
 
-func (rs *rpcServer) KeepAlive(li *LeaseInfo, events *[]server.Event) error {
+func (rs *rpcServer) KeepAlive(args *KeepAliveArgs, events *[]server.Event) error {
 
 	leases := server.LeaseInfo{}
 
-	for _, l := range li.LockedNodes {
+	for _, l := range args.LeaseInfo {
 		nd, err := server.DeserializeNodeDescriptor(l)
 		if err != nil {
 			return errors.New("Failed to deserialize lease info")
@@ -57,7 +58,7 @@ func (rs *rpcServer) KeepAlive(li *LeaseInfo, events *[]server.Event) error {
 
 	}
 
-	tmp_events, err := rs.delegate.KeepAlive(leases)
+	tmp_events, err := rs.delegate.KeepAlive(leases, args.EventsInfo)
 
 	if err != nil {
 		return err
