@@ -184,3 +184,7 @@ func (nh *nodeHandleImpl) SetContent(contents string, generation uint64) (bool, 
 func (nh *nodeHandleImpl) Delete() error {
 	panic("implement me")
 }
+
+func (nh *nodeHandleImpl) Path() string {
+	return nh.nd.Path()
+}

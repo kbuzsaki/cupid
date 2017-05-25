@@ -81,7 +81,7 @@ func (s *serverImpl) Open(path string, readOnly bool, events EventsConfig) (Node
 	// TODO: semantics regarding deletion and whether a descriptor is still valid after deletion
 	ni := s.nodes.GetOrCreateNode(path)
 	key := s.descriptors.OpenDescriptor(ni, readOnly)
-	return NodeDescriptor{key}, nil
+	return NodeDescriptor{key, path}, nil
 }
 
 func (s *serverImpl) Acquire(nd NodeDescriptor) error {

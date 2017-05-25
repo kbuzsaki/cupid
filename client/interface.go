@@ -28,4 +28,5 @@ type NodeHandle interface {
 	Locker
 	File
 	Delete() error
+	Path() string
 }

@@ -24,7 +24,8 @@ var (
 	value      = ""
 	generation = uint64(0)
 	cl         client.Client
-	handles    = map[string]client.NodeHandle{}
+	subscriber client.Subscriber
+	handles    = make(map[string]client.NodeHandle)
 )
 
 const (
@@ -68,6 +69,18 @@ func maybePrintHelp(ok bool) bool {
 	return !ok
 }
 
+func mustGetNodeHandle(path string) client.NodeHandle {
+	if _, ok := handles[path]; !ok {
+		nh, err := cl.Open(path, false, server.EventsConfig{})
+		if err != nil {
+			log.Fatalf("open error:", err)
+		}
+		handles[path] = nh
+	}
+
+	return handles[path]
+}
+
 func parseGet(args []string) bool {
 	if len(args) == 0 {
 		path = ""
@@ -83,10 +96,7 @@ func handleGet(args []string) bool {
 		return false
 	}
 
-	nh, err := cl.Open(path, true, server.EventsConfig{})
-	if err != nil {
-		log.Fatalf("get open error:", err)
-	}
+	nh := mustGetNodeHandle(path)
 	cas, err := nh.GetContentAndStat()
 	if err != nil {
 		log.Fatalf("get error:", err)
@@ -130,10 +140,7 @@ func handleSet(args []string) bool {
 		return true
 	}
 
-	nh, err := cl.Open(path, false, server.EventsConfig{})
-	if err != nil {
-		log.Fatalf("set open error:", err)
-	}
+	nh := mustGetNodeHandle(path)
 	ok, err := nh.SetContent(value, generation)
 	if err != nil {
 		log.Fatalf("set error:", err)
@@ -150,12 +157,9 @@ func handleLock(args []string) bool {
 		return true
 	}
 
-	nh, err := cl.Open(path, false, server.EventsConfig{})
-	if err != nil {
-		log.Fatalf("lock open error:\n", err)
-	}
+	nh := mustGetNodeHandle(path)
 
-	err = nh.Acquire()
+	err := nh.Acquire()
 	handles[path] = nh
 	if err != nil {
 		log.Fatalf("lock error: %v\n", err)
@@ -169,10 +173,7 @@ func handleUnlock(args []string) bool {
 		return true
 	}
 
-	nh, ok := handles[path]
-	if !ok {
-		fmt.Println("Invalid lock name provided: %#v\n", path)
-	}
+	nh := mustGetNodeHandle(path)
 
 	err := nh.Release()
 	if err != nil {
@@ -187,10 +188,7 @@ func handleTryLock(args []string) bool {
 		return true
 	}
 
-	nh, err := cl.Open(path, false, server.EventsConfig{})
-	if err != nil {
-		log.Fatalf("Try Lock open error:%v\n", err)
-	}
+	nh := mustGetNodeHandle(path)
 
 	succ, e := nh.TryAcquire()
 	if e != nil {
@@ -202,6 +200,23 @@ func handleTryLock(args []string) bool {
 	} else {
 		fmt.Println("Failed to Acquire Lock")
 	}
+
+	return true
+}
+
+func handleSubscribe(args []string) bool {
+	if maybePrintHelp(parseGet(args)) {
+		return true
+	}
+
+	nh := mustGetNodeHandle(path)
+	nh.GetContentAndStat()
+
+	subscriber.Register(path, func(path string, cas server.NodeContentAndStat) {
+		fmt.Println("Event published for path:", path, "content:", cas)
+	})
+
+	fmt.Println("Subscribed!")
 
 	return true
 }
@@ -219,6 +234,8 @@ func runCmd(args []string) bool {
 		return handleSet(args)
 	case "trylock":
 		return handleTryLock(args)
+	case "subscribe":
+		return handleSubscribe(args)
 	case "wait":
 		time.Sleep(10 * time.Second)
 		return true
@@ -285,8 +302,9 @@ func main() {
 	}
 	cl = tmp_cl
 
-	if debug {
-		go printEvents(cl.GetEventsOut())
+	subscriber, err = client.NewSubscriber(cl)
+	if err != nil {
+		log.Fatal("failed to open subscriber")
 	}
 
 	if command == "" {

@@ -1,6 +1,10 @@
 package server
 
-import "time"
+import (
+	"log"
+	"strings"
+	"time"
+)
 
 type Server interface {
 	KeepAlive(li LeaseInfo, eis []EventInfo) ([]Event, error)
@@ -18,6 +22,11 @@ type Server interface {
 
 type NodeDescriptor struct {
 	descriptor descriptorKey
+	path       string
+}
+
+func (nd NodeDescriptor) Path() string {
+	return nd.path
 }
 
 func (nd NodeDescriptor) GobEncode() ([]byte, error) {
@@ -36,16 +45,24 @@ func (ndp *NodeDescriptor) GobDecode(b []byte) error {
 }
 
 func (nd NodeDescriptor) Serialize() string {
-	return nd.descriptor.Serialize()
+	return nd.descriptor.Serialize() + "|" + nd.path
 }
 
 func DeserializeNodeDescriptor(s string) (NodeDescriptor, error) {
-	descriptor, err := DeserializeDescriptorKey(s)
+	ss := strings.SplitN(s, "|", 2)
+	if len(ss) != 2 {
+		log.Printf("invalid node descriptor: %#v\n", s)
+		return NodeDescriptor{}, ErrInvalidNodeDescriptor
+	}
+
+	descriptor, err := DeserializeDescriptorKey(ss[0])
 	if err != nil {
 		return NodeDescriptor{}, err
 	}
 
-	return NodeDescriptor{descriptor}, nil
+	path := ss[1]
+
+	return NodeDescriptor{descriptor, path}, nil
 }
 
 // LeaseInfo represents a session and the locks tha a session thinks it holds
