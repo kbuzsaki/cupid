@@ -61,15 +61,15 @@ func (s *subscriber) handleEvent(rawEvent server.Event) {
 		}
 
 		//log.Println("got invalidation event for nd:", event.Descriptor)
-		cb := s.callbacks[event.Descriptor.Path()]
+		cb := s.callbacks[event.Descriptor.Path]
 		if cb != nil {
-			cb(event.Descriptor.Path(), cas)
+			cb(event.Descriptor.Path, cas)
 		}
 	case server.ContentInvalidationPushEvent:
-		cb := s.callbacks[event.Descriptor.Path()]
+		cb := s.callbacks[event.Descriptor.Path]
 		//log.Println("got push event for nd:", event.Descriptor)
 		if cb != nil {
-			cb(event.Descriptor.Path(), event.NodeContentAndStat)
+			cb(event.Descriptor.Path, event.NodeContentAndStat)
 		}
 	}
 }

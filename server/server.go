@@ -10,8 +10,8 @@ const (
 )
 
 var (
-	ErrInvalidNodeDescriptor  = errors.New("Invalid node descriptor")
-	ErrReadOnlyNodeDescriptor = errors.New("Write from read-only node descriptor")
+	ErrInvalidNodeDescriptor  = errors.New("Invalid node Descriptor")
+	ErrReadOnlyNodeDescriptor = errors.New("Write from read-only node Descriptor")
 )
 
 type serverImpl struct {
@@ -38,7 +38,7 @@ func minTime(keepAliveDelay time.Duration) time.Duration {
 func (s *serverImpl) KeepAlive(li LeaseInfo, eis []EventInfo, keepAliveDelay time.Duration) ([]Event, error) {
 	defer func() {
 		for _, nd := range li.LockedNodes {
-			nid := s.descriptors.GetDescriptor(nd.descriptor)
+			nid := s.descriptors.GetDescriptor(nd.Descriptor)
 			if nid != nil && nid.ni.OwnedBy(nid) {
 				nid.ni.ExitKeepAlive()
 			}
@@ -47,7 +47,7 @@ func (s *serverImpl) KeepAlive(li LeaseInfo, eis []EventInfo, keepAliveDelay tim
 	// check if you own all the locks you think you own
 	var events []Event
 	for _, nd := range li.LockedNodes {
-		nid := s.descriptors.GetDescriptor(nd.descriptor)
+		nid := s.descriptors.GetDescriptor(nd.Descriptor)
 		if nid == nil {
 			return nil, ErrInvalidNodeDescriptor
 		}
@@ -93,7 +93,7 @@ func (s *serverImpl) Open(path string, readOnly bool, events EventsConfig) (Node
 }
 
 func (s *serverImpl) Acquire(nd NodeDescriptor) error {
-	nid := s.descriptors.GetDescriptor(nd.descriptor)
+	nid := s.descriptors.GetDescriptor(nd.Descriptor)
 	if nid == nil {
 		return ErrInvalidNodeDescriptor
 	} else if nid.readOnly {
@@ -106,7 +106,7 @@ func (s *serverImpl) Acquire(nd NodeDescriptor) error {
 }
 
 func (s *serverImpl) TryAcquire(nd NodeDescriptor) (bool, error) {
-	nid := s.descriptors.GetDescriptor(nd.descriptor)
+	nid := s.descriptors.GetDescriptor(nd.Descriptor)
 	if nid == nil {
 		return false, ErrInvalidNodeDescriptor
 	} else if nid.readOnly {
@@ -118,7 +118,7 @@ func (s *serverImpl) TryAcquire(nd NodeDescriptor) (bool, error) {
 
 // TODO: prevent releases by an unrelated node descriptor
 func (s *serverImpl) Release(nd NodeDescriptor) error {
-	nid := s.descriptors.GetDescriptor(nd.descriptor)
+	nid := s.descriptors.GetDescriptor(nd.Descriptor)
 	if nid == nil {
 		return ErrInvalidNodeDescriptor
 	} else if nid.readOnly {
@@ -129,7 +129,7 @@ func (s *serverImpl) Release(nd NodeDescriptor) error {
 }
 
 func (s *serverImpl) GetContentAndStat(nd NodeDescriptor) (NodeContentAndStat, error) {
-	nid := s.descriptors.GetDescriptor(nd.descriptor)
+	nid := s.descriptors.GetDescriptor(nd.Descriptor)
 	if nid == nil {
 		return NodeContentAndStat{}, ErrInvalidNodeDescriptor
 	}
@@ -146,7 +146,7 @@ func (s *serverImpl) GetContentAndStat(nd NodeDescriptor) (NodeContentAndStat, e
 }
 
 func (s *serverImpl) SetContent(nd NodeDescriptor, content string, generation uint64) (bool, error) {
-	nid := s.descriptors.GetDescriptor(nd.descriptor)
+	nid := s.descriptors.GetDescriptor(nd.Descriptor)
 	if nid == nil {
 		return false, ErrInvalidNodeDescriptor
 	} else if nid.readOnly {

@@ -1,8 +1,6 @@
 package rpcclient
 
 import (
-	"errors"
-
 	"time"
 
 	"github.com/kbuzsaki/cupid/server"
@@ -23,7 +21,7 @@ type RPCServer interface {
 }
 
 type KeepAliveArgs struct {
-	LeaseInfo      []string
+	LeaseInfo      server.LeaseInfo
 	EventsInfo     []server.EventInfo
 	KeepAliveDelay time.Duration
 }
@@ -53,21 +51,7 @@ func (rs *rpcServer) Ping(_, _ *int) error {
 }
 
 func (rs *rpcServer) KeepAlive(args *KeepAliveArgs, events *[]server.Event) error {
-
-	leases := server.LeaseInfo{}
-
-	for _, l := range args.LeaseInfo {
-		nd, err := server.DeserializeNodeDescriptor(l)
-		if err != nil {
-			return errors.New("Failed to deserialize lease info")
-		}
-
-		leases.LockedNodes = append(leases.LockedNodes, nd)
-
-	}
-
-	tmp_events, err := rs.delegate.KeepAlive(leases, args.EventsInfo, args.KeepAliveDelay)
-
+	tmp_events, err := rs.delegate.KeepAlive(args.LeaseInfo, args.EventsInfo, args.KeepAliveDelay)
 	if err != nil {
 		return err
 	}

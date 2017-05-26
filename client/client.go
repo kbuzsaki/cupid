@@ -60,7 +60,7 @@ func (cl *clientImpl) GetEventsOut() <-chan server.Event {
 }
 
 func (cl *clientImpl) register(nd server.NodeDescriptor, cb SubscriberCallback) {
-	cl.subscriber.Register(nd.Path(), cb)
+	cl.subscriber.Register(nd.Path, cb)
 }
 
 func (cl *clientImpl) handleEvents(events []server.Event) {
@@ -195,7 +195,7 @@ func (nh *nodeHandleImpl) Delete() error {
 }
 
 func (nh *nodeHandleImpl) Path() string {
-	return nh.nd.Path()
+	return nh.nd.Path
 }
 
 func (nh *nodeHandleImpl) Register(cb SubscriberCallback) {

@@ -15,16 +15,9 @@ func New(addr string, keepAliveDelay time.Duration) server.Server {
 }
 
 func (cg *clientGlue) KeepAlive(li server.LeaseInfo, eventsInfo []server.EventInfo, keepAliveDelay time.Duration) ([]server.Event, error) {
-
-	leases := []string{}
 	events := []server.Event{}
 
-	for _, l := range li.LockedNodes {
-		lease := l.Serialize()
-		leases = append(leases, lease)
-	}
-
-	args := KeepAliveArgs{leases, eventsInfo, keepAliveDelay}
+	args := KeepAliveArgs{li, eventsInfo, keepAliveDelay}
 	err := cg.delegate.KeepAlive(&args, &events)
 
 	if err != nil {

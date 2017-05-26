@@ -33,7 +33,7 @@ func DoServerTest_KeepAlive(t *testing.T, s Server) {
 			t.Error("Expected LockInvalidationEvent, got:", events[0])
 		} else {
 			if event.Descriptor != nd {
-				t.Error("Got wrong descriptor, expected:", nd, ", was:", event.Descriptor)
+				t.Error("Got wrong Descriptor, expected:", nd, ", was:", event.Descriptor)
 			}
 		}
 	}
@@ -123,24 +123,24 @@ func DoServerTest_OpenReadOnly(t *testing.T, s Server) {
 	}
 
 	_, err = s.SetContent(nd, "foo", 16)
-	ae("Expected error from SetContent with read only descriptor", err)
+	ae("Expected error from SetContent with read only Descriptor", err)
 
 	oldCas := cas
 
 	cas, err = s.GetContentAndStat(nd)
 	ne("Error GetContentAndStat /foo/bar:", err)
 	if cas != oldCas {
-		t.Error("Erroneously modified node from read only descriptor")
+		t.Error("Erroneously modified node from read only Descriptor")
 	}
 
 	err = s.Acquire(nd)
-	ae("Expected error from Acquire with read only descriptor", err)
+	ae("Expected error from Acquire with read only Descriptor", err)
 
 	_, err = s.TryAcquire(nd)
-	ae("Expected error from TryAcquire with read only descriptor", err)
+	ae("Expected error from TryAcquire with read only Descriptor", err)
 
 	err = s.Release(nd)
-	ae("Expected error from Release with read only descriptor", err)
+	ae("Expected error from Release with read only Descriptor", err)
 }
 
 func DoServerTest_SetContentGeneration(t *testing.T, s Server) {
