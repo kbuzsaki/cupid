@@ -94,9 +94,6 @@ func (cl *clientImpl) handleEvents(events []server.Event) {
 // background does background KeepAlive processing in a goroutine
 func (cl *clientImpl) keepAlive() {
 	for {
-		before := time.Now()
-
-		// TODO: make an actual LeaseInfo
 		li := cl.locks.GetLeaseInfo()
 		li.Session = cl.sd
 		events, err := cl.s.KeepAlive(li, cl.nodeCache.GetEventInfos(), cl.keepAliveDelay)
@@ -106,16 +103,7 @@ func (cl *clientImpl) keepAlive() {
 		}
 
 		if len(events) > 0 {
-			// TODO: pass events to callback / goroutine / whatever
-			// TODO: cache invalidation
 			cl.handleEvents(events)
-		}
-
-		// before looping around, make sure that it's been at least the minimum amount of time
-		// before we start another KeepAlive
-		duration := time.Since(before)
-		if duration < minimumKeepAliveDelay {
-			time.Sleep(minimumKeepAliveDelay - duration)
 		}
 	}
 }
