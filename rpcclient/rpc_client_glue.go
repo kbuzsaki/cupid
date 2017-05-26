@@ -27,8 +27,18 @@ func (cg *clientGlue) KeepAlive(li server.LeaseInfo, eventsInfo []server.EventIn
 	return events, nil
 }
 
-func (cg *clientGlue) Open(path string, readOnly bool, events server.EventsConfig) (server.NodeDescriptor, error) {
-	args := OpenArgs{path, readOnly, events}
+func (cg *clientGlue) OpenSession() (server.SessionDescriptor, error) {
+	sd := server.SessionDescriptor{}
+	err := cg.delegate.OpenSession(0, &sd)
+	if err != nil {
+		return server.SessionDescriptor{}, err
+	}
+
+	return sd, nil
+}
+
+func (cg *clientGlue) Open(sd server.SessionDescriptor, path string, readOnly bool, events server.EventsConfig) (server.NodeDescriptor, error) {
+	args := OpenArgs{sd, path, readOnly, events}
 	nd := server.NodeDescriptor{}
 	err := cg.delegate.Open(&args, &nd)
 	if err != nil {

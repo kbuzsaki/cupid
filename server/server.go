@@ -10,20 +10,21 @@ const (
 )
 
 var (
-	ErrInvalidNodeDescriptor  = errors.New("Invalid node Descriptor")
-	ErrReadOnlyNodeDescriptor = errors.New("Write from read-only node Descriptor")
+	ErrInvalidSessionDescriptor = errors.New("Invalid session descriptor")
+	ErrInvalidNodeDescriptor    = errors.New("Invalid node descriptor")
+	ErrReadOnlyNodeDescriptor   = errors.New("Write from read-only node descriptor")
 )
 
 type serverImpl struct {
-	nodes       *nodeInfoMap
-	descriptors *nodeDescriptorMap
+	nodes    *nodeInfoMap
+	sessions *sessionDescriptorMap
 }
 
 // TODO: accept a config file instead?
 func New() (Server, error) {
 	return &serverImpl{
-		nodes:       makeNodeInfoMap(),
-		descriptors: makeNodeDescriptorMap(),
+		nodes:    makeNodeInfoMap(),
+		sessions: makeSessionDescriptorMap(),
 	}, nil
 }
 
@@ -38,7 +39,7 @@ func minTime(keepAliveDelay time.Duration) time.Duration {
 func (s *serverImpl) KeepAlive(li LeaseInfo, eis []EventInfo, keepAliveDelay time.Duration) ([]Event, error) {
 	defer func() {
 		for _, nd := range li.LockedNodes {
-			nid := s.descriptors.GetDescriptor(nd.Descriptor)
+			nid := s.sessions.GetDescriptor(nd)
 			if nid != nil && nid.ni.OwnedBy(nid) {
 				nid.ni.ExitKeepAlive()
 			}
@@ -47,7 +48,7 @@ func (s *serverImpl) KeepAlive(li LeaseInfo, eis []EventInfo, keepAliveDelay tim
 	// check if you own all the locks you think you own
 	var events []Event
 	for _, nd := range li.LockedNodes {
-		nid := s.descriptors.GetDescriptor(nd.Descriptor)
+		nid := s.sessions.GetDescriptor(nd)
 		if nid == nil {
 			return nil, ErrInvalidNodeDescriptor
 		}
@@ -85,15 +86,25 @@ func (s *serverImpl) KeepAlive(li LeaseInfo, eis []EventInfo, keepAliveDelay tim
 	return events, nil
 }
 
-func (s *serverImpl) Open(path string, readOnly bool, events EventsConfig) (NodeDescriptor, error) {
+func (s *serverImpl) OpenSession() (SessionDescriptor, error) {
+	key := s.sessions.OpenSession()
+	return SessionDescriptor{key}, nil
+}
+
+func (s *serverImpl) Open(sd SessionDescriptor, path string, readOnly bool, events EventsConfig) (NodeDescriptor, error) {
 	// TODO: semantics regarding deletion and whether a descriptor is still valid after deletion
+	session := s.sessions.GetSession(sd.Descriptor)
+	if session == nil {
+		return NodeDescriptor{}, ErrInvalidSessionDescriptor
+	}
+
 	ni := s.nodes.GetOrCreateNode(path)
-	key := s.descriptors.OpenDescriptor(ni, readOnly)
-	return NodeDescriptor{key, path}, nil
+	key := session.OpenDescriptor(ni, readOnly)
+	return NodeDescriptor{sd, key, path}, nil
 }
 
 func (s *serverImpl) Acquire(nd NodeDescriptor) error {
-	nid := s.descriptors.GetDescriptor(nd.Descriptor)
+	nid := s.sessions.GetDescriptor(nd)
 	if nid == nil {
 		return ErrInvalidNodeDescriptor
 	} else if nid.readOnly {
@@ -106,7 +117,7 @@ func (s *serverImpl) Acquire(nd NodeDescriptor) error {
 }
 
 func (s *serverImpl) TryAcquire(nd NodeDescriptor) (bool, error) {
-	nid := s.descriptors.GetDescriptor(nd.Descriptor)
+	nid := s.sessions.GetDescriptor(nd)
 	if nid == nil {
 		return false, ErrInvalidNodeDescriptor
 	} else if nid.readOnly {
@@ -118,7 +129,7 @@ func (s *serverImpl) TryAcquire(nd NodeDescriptor) (bool, error) {
 
 // TODO: prevent releases by an unrelated node descriptor
 func (s *serverImpl) Release(nd NodeDescriptor) error {
-	nid := s.descriptors.GetDescriptor(nd.Descriptor)
+	nid := s.sessions.GetDescriptor(nd)
 	if nid == nil {
 		return ErrInvalidNodeDescriptor
 	} else if nid.readOnly {
@@ -129,7 +140,7 @@ func (s *serverImpl) Release(nd NodeDescriptor) error {
 }
 
 func (s *serverImpl) GetContentAndStat(nd NodeDescriptor) (NodeContentAndStat, error) {
-	nid := s.descriptors.GetDescriptor(nd.Descriptor)
+	nid := s.sessions.GetDescriptor(nd)
 	if nid == nil {
 		return NodeContentAndStat{}, ErrInvalidNodeDescriptor
 	}
@@ -146,7 +157,7 @@ func (s *serverImpl) GetContentAndStat(nd NodeDescriptor) (NodeContentAndStat, e
 }
 
 func (s *serverImpl) SetContent(nd NodeDescriptor, content string, generation uint64) (bool, error) {
-	nid := s.descriptors.GetDescriptor(nd.Descriptor)
+	nid := s.sessions.GetDescriptor(nd)
 	if nid == nil {
 		return false, ErrInvalidNodeDescriptor
 	} else if nid.readOnly {

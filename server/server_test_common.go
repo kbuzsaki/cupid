@@ -12,6 +12,9 @@ func DoServerTest_KeepAlive(t *testing.T, s Server) {
 		}
 	}
 
+	sd, err := s.OpenSession()
+	ne("Error opening session:", err)
+
 	events, err := s.KeepAlive(LeaseInfo{}, nil, 1)
 	ne("KeepAlive with Empty LeaseInfo", err)
 	if len(events) != 0 {
@@ -19,7 +22,7 @@ func DoServerTest_KeepAlive(t *testing.T, s Server) {
 	}
 
 	// test with LeaseInfo that claims to have a lock we don't have
-	nd, err := s.Open("/foo/bar", false, EventsConfig{})
+	nd, err := s.Open(sd,"/foo/bar", false, EventsConfig{})
 	ne("Error opening /foo/bar:", err)
 
 	// expect to get lock invalidation event
@@ -62,7 +65,10 @@ func DoServerTest_OpenGetSet(t *testing.T, s Server) {
 
 	contents := []string{"some content", "dog", "foo bar", "foo bar"}
 
-	nd, err := s.Open("/foo/bar", false, EventsConfig{})
+	sd, err := s.OpenSession()
+	ne("Error opening session:", err)
+
+	nd, err := s.Open(sd,"/foo/bar", false, EventsConfig{})
 	ne("Error opening /foo/bar:", err)
 
 	cas, err := s.GetContentAndStat(nd)
@@ -110,7 +116,10 @@ func DoServerTest_OpenReadOnly(t *testing.T, s Server) {
 		}
 	}
 
-	nd, err := s.Open("/foo/bar", true, EventsConfig{})
+	sd, err := s.OpenSession()
+	ne("Error opening session:", err)
+
+	nd, err := s.Open(sd,"/foo/bar", true, EventsConfig{})
 	ne("Error opening /foo/bar:", err)
 
 	cas, err := s.GetContentAndStat(nd)
@@ -150,7 +159,10 @@ func DoServerTest_SetContentGeneration(t *testing.T, s Server) {
 		}
 	}
 
-	nd, err := s.Open("/foo/bar", false, EventsConfig{})
+	sd, err := s.OpenSession()
+	ne("Error opening session:", err)
+
+	nd, err := s.Open(sd,"/foo/bar", false, EventsConfig{})
 	ne("Error opening /foo/bar:", err)
 
 	cas, err := s.GetContentAndStat(nd)
@@ -230,7 +242,10 @@ func DoServerTest_ConcurrentOpen(t *testing.T, s Server) {
 			// wait until all children are created to do concurrent open
 			mainDone1.Wait()
 
-			nd, err := s.Open("/foo/baz", false, EventsConfig{})
+			sd, err := s.OpenSession()
+			ne("Error opening session:", err)
+
+			nd, err := s.Open(sd,"/foo/baz", false, EventsConfig{})
 			ne("Error opening file in child:", err)
 
 			// signal that this child is done and wait until main is done
@@ -256,8 +271,11 @@ func DoServerTest_ConcurrentOpen(t *testing.T, s Server) {
 	mainDone1.Done()
 	childrenDone.Wait()
 
+	sd, err := s.OpenSession()
+	ne("Error opening session:", err)
+
 	// set the content so that all of the children can read it
-	nd, err := s.Open("/foo/baz", false, EventsConfig{})
+	nd, err := s.Open(sd,"/foo/baz", false, EventsConfig{})
 	ne("Error opening file in main:", err)
 
 	ok, err := s.SetContent(nd, content, 10)
@@ -279,7 +297,10 @@ func DoServerTest_TryAcquire(t *testing.T, s Server) {
 		}
 	}
 
-	nd, err := s.Open("/foo/bar", false, EventsConfig{})
+	sd, err := s.OpenSession()
+	ne("Error opening session:", err)
+
+	nd, err := s.Open(sd,"/foo/bar", false, EventsConfig{})
 	ne("Error opening /foo/bar:", err)
 
 	err = s.Release(nd)
@@ -322,10 +343,13 @@ func DoServerTest_BadRelease(t *testing.T, s Server) {
 		}
 	}
 
-	nd1, err := s.Open("/foo/bar", false, EventsConfig{})
+	sd, err := s.OpenSession()
+	ne("Error opening session:", err)
+
+	nd1, err := s.Open(sd,"/foo/bar", false, EventsConfig{})
 	ne("Error opening /foo/bar nd1:", err)
 
-	nd2, err := s.Open("/foo/bar", false, EventsConfig{})
+	nd2, err := s.Open(sd,"/foo/bar", false, EventsConfig{})
 	ne("Error opening /foo/bar nd2:", err)
 
 	ok, err := s.TryAcquire(nd1)

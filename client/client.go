@@ -14,7 +14,8 @@ const (
 )
 
 type clientImpl struct {
-	s server.Server
+	s  server.Server
+	sd server.SessionDescriptor
 
 	eventsIn  chan<- server.Event
 	eventsOut <-chan server.Event
@@ -50,6 +51,13 @@ func newFromServer(s server.Server, keepAliveDelay time.Duration) (Client, error
 		return nil, err
 	}
 	cl.subscriber = subscriber
+
+	sd, err := s.OpenSession()
+	if err != nil {
+		return nil, err
+	}
+	cl.sd = sd
+
 	go cl.keepAlive()
 
 	return cl, nil
@@ -111,7 +119,7 @@ func (cl *clientImpl) keepAlive() {
 }
 
 func (cl *clientImpl) Open(path string, readOnly bool, events server.EventsConfig) (NodeHandle, error) {
-	nd, err := cl.s.Open(path, readOnly, events)
+	nd, err := cl.s.Open(cl.sd, path, readOnly, events)
 	if err != nil {
 		return nil, err
 	}

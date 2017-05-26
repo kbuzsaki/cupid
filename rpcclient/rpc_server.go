@@ -10,6 +10,8 @@ type RPCServer interface {
 	Ping(_, _ *int) error
 
 	KeepAlive(args *KeepAliveArgs, events *[]server.Event) error
+
+	OpenSession(_ int, sd *server.SessionDescriptor) error
 	Open(args *OpenArgs, nd *server.NodeDescriptor) error
 
 	Acquire(node server.NodeDescriptor, _ *int) error
@@ -27,6 +29,7 @@ type KeepAliveArgs struct {
 }
 
 type OpenArgs struct {
+	SD           server.SessionDescriptor
 	Path         string
 	ReadOnly     bool
 	EventsConfig server.EventsConfig
@@ -60,8 +63,18 @@ func (rs *rpcServer) KeepAlive(args *KeepAliveArgs, events *[]server.Event) erro
 	return nil
 }
 
+func (rs *rpcServer) OpenSession(_ int, sd *server.SessionDescriptor) error {
+	descriptor, err := rs.delegate.OpenSession()
+	if err != nil {
+		return err
+	}
+
+	*sd = descriptor
+	return nil
+}
+
 func (rs *rpcServer) Open(args *OpenArgs, nd *server.NodeDescriptor) error {
-	descriptor, err := rs.delegate.Open(args.Path, args.ReadOnly, args.EventsConfig)
+	descriptor, err := rs.delegate.Open(args.SD, args.Path, args.ReadOnly, args.EventsConfig)
 	if err != nil {
 		return err
 	}

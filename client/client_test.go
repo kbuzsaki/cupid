@@ -17,11 +17,12 @@ func TestClientImpl_Open(t *testing.T) {
 		}
 	}
 	mockServer := &mocks.Server{}
-	cl := clientImpl{s: mockServer}
+	sd := server.SessionDescriptor{3}
+	cl := clientImpl{s: mockServer, sd: sd}
 
 	// success case
-	nd := server.NodeDescriptor{}
-	mockServer.On("Open", "/foo/bar", false, server.EventsConfig{}).Return(nd, nil)
+	nd := server.NodeDescriptor{sd, 4, "/foo/bar"}
+	mockServer.On("Open", sd, "/foo/bar", false, server.EventsConfig{}).Return(nd, nil)
 
 	// test success
 	nh, err := cl.Open("/foo/bar", false, server.EventsConfig{})
@@ -33,7 +34,7 @@ func TestClientImpl_Open(t *testing.T) {
 
 	// failure case
 	someError := errors.New("some error")
-	mockServer.On("Open", "/bad/file", false, server.EventsConfig{}).Return(server.NodeDescriptor{}, someError)
+	mockServer.On("Open", sd, "/bad/file", false, server.EventsConfig{}).Return(server.NodeDescriptor{}, someError)
 
 	nh, err = cl.Open("/bad/file", false, server.EventsConfig{})
 	if err == nil {

@@ -5,7 +5,8 @@ import "time"
 type Server interface {
 	KeepAlive(li LeaseInfo, eis []EventInfo, keepAliveDelay time.Duration) ([]Event, error)
 
-	Open(path string, readOnly bool, events EventsConfig) (NodeDescriptor, error)
+	OpenSession() (SessionDescriptor, error)
+	Open(sd SessionDescriptor, path string, readOnly bool, events EventsConfig) (NodeDescriptor, error)
 
 	Acquire(node NodeDescriptor) error
 	TryAcquire(node NodeDescriptor) (bool, error)
@@ -15,7 +16,12 @@ type Server interface {
 	SetContent(node NodeDescriptor, content string, generation uint64) (bool, error)
 }
 
+type SessionDescriptor struct {
+	Descriptor descriptorKey
+}
+
 type NodeDescriptor struct {
+	Session    SessionDescriptor
 	Descriptor descriptorKey
 	Path       string
 }

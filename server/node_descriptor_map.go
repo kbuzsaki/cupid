@@ -4,6 +4,38 @@ import "sync"
 
 type descriptorKey uint64
 
+type sessionDescriptor struct {
+	*nodeDescriptorMap
+}
+
+type sessionDescriptorMap struct {
+	lock    sync.RWMutex
+	data    map[descriptorKey]*sessionDescriptor
+	nextKey descriptorKey
+}
+
+func makeSessionDescriptorMap() *sessionDescriptorMap {
+	return &sessionDescriptorMap{data: make(map[descriptorKey]*sessionDescriptor)}
+}
+
+func (sdm *sessionDescriptorMap) GetDescriptor(nd NodeDescriptor) *nodeDescriptor {
+	return sdm.GetSession(nd.Session.Descriptor).GetDescriptor(nd.Descriptor)
+}
+
+func (sdm *sessionDescriptorMap) GetSession(key descriptorKey) *sessionDescriptor {
+	sdm.lock.RLock()
+	defer sdm.lock.RUnlock()
+	return sdm.data[key]
+}
+
+func (sdm *sessionDescriptorMap) OpenSession() descriptorKey {
+	sdm.lock.Lock()
+	defer sdm.lock.Unlock()
+	sdm.nextKey++
+	sdm.data[sdm.nextKey] = &sessionDescriptor{nodeDescriptorMap: makeNodeDescriptorMap()}
+	return sdm.nextKey
+}
+
 type nodeDescriptor struct {
 	ni       *nodeInfo
 	readOnly bool
@@ -21,8 +53,13 @@ func makeNodeDescriptorMap() *nodeDescriptorMap {
 }
 
 func (nid *nodeDescriptorMap) GetDescriptor(key descriptorKey) *nodeDescriptor {
+	if nid == nil {
+		return nil
+	}
+
 	nid.lock.RLock()
 	defer nid.lock.RUnlock()
+
 	return nid.data[key]
 }
 

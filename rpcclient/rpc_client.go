@@ -66,6 +66,15 @@ func (cl *client) KeepAlive(args *KeepAliveArgs, events *[]server.Event) error {
 	return conn.Call("Cupid.KeepAlive", args, events)
 }
 
+func (cl *client) OpenSession(_ int, sd *server.SessionDescriptor) error {
+	conn, err := cl.getConn()
+	if err != nil {
+		return err
+	}
+
+	return conn.Call("Cupid.OpenSession", 0, sd)
+}
+
 func (cl *client) Open(args *OpenArgs, nd *server.NodeDescriptor) error {
 	conn, err := cl.getConn()
 	if err != nil {
