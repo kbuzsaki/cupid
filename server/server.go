@@ -174,7 +174,10 @@ func (s *serverImpl) SetContent(nd NodeDescriptor, content string, generation ui
 
 	sds := s.sessions.GetSessionDescriptors()
 	for _, sd := range sds {
-		s.sessions.GetSession(sd).signaler.Signal()
+		session := s.sessions.GetSession(sd)
+		if len(session.GetDescriptors(nd.Path)) > 0 {
+			session.signaler.Signal()
+		}
 	}
 
 	return nid.ni.SetContent(content, generation), nil
