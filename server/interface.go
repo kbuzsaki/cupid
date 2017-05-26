@@ -16,7 +16,6 @@ type Server interface {
 	Release(node NodeDescriptor) error
 
 	GetContentAndStat(node NodeDescriptor) (NodeContentAndStat, error)
-	GetStat(node NodeDescriptor) (NodeStat, error)
 	SetContent(node NodeDescriptor, content string, generation uint64) (bool, error)
 }
 

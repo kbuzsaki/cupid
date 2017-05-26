@@ -111,15 +111,6 @@ func (cl *client) GetContentAndStat(node server.NodeDescriptor, cas *server.Node
 	return conn.Call("Cupid.GetContentAndStat", node, cas)
 }
 
-func (cl *client) GetStat(node server.NodeDescriptor, stat *server.NodeStat) error {
-	conn, err := cl.getConn()
-	if err != nil {
-		return err
-	}
-
-	return conn.Call("Cupid.GetStat", node, stat)
-}
-
 func (cl *client) SetContent(args *SetContentArgs, success *bool) error {
 	conn, err := cl.getConn()
 	if err != nil {

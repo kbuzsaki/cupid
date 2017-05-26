@@ -65,12 +65,6 @@ func (cg *clientGlue) GetContentAndStat(node server.NodeDescriptor) (server.Node
 	return cas, err
 }
 
-func (cg *clientGlue) GetStat(node server.NodeDescriptor) (server.NodeStat, error) {
-	stat := server.NodeStat{}
-	err := cg.delegate.GetStat(node, &stat)
-	return stat, err
-}
-
 func (cg *clientGlue) SetContent(node server.NodeDescriptor, content string, generation uint64) (bool, error) {
 	setContentArgs := SetContentArgs{node, content, generation}
 	ok := false

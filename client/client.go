@@ -186,10 +186,6 @@ func (nh *nodeHandleImpl) GetContentAndStat() (server.NodeContentAndStat, error)
 	return cas, nil
 }
 
-func (nh *nodeHandleImpl) GetStat() (server.NodeStat, error) {
-	return nh.cl.s.GetStat(nh.nd)
-}
-
 func (nh *nodeHandleImpl) SetContent(contents string, generation uint64) (bool, error) {
 	return nh.cl.s.SetContent(nh.nd, contents, generation)
 }

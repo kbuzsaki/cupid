@@ -19,7 +19,6 @@ type RPCServer interface {
 	Release(node server.NodeDescriptor, _ *int) error
 
 	GetContentAndStat(node server.NodeDescriptor, cas *server.NodeContentAndStat) error
-	GetStat(node server.NodeDescriptor, stat *server.NodeStat) error
 	SetContent(args *SetContentArgs, success *bool) error
 }
 
@@ -113,16 +112,6 @@ func (rs *rpcServer) GetContentAndStat(snd server.NodeDescriptor, cas *server.No
 	}
 
 	*cas = nodeCas
-	return nil
-}
-
-func (rs *rpcServer) GetStat(snd server.NodeDescriptor, stat *server.NodeStat) error {
-	nodeStat, err := rs.delegate.GetStat(snd)
-	if err != nil {
-		return err
-	}
-
-	*stat = nodeStat
 	return nil
 }
 

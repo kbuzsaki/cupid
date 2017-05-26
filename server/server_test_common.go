@@ -94,12 +94,6 @@ func DoServerTest_OpenGetSet(t *testing.T, s Server) {
 			t.Error("Generation not higher for new cas: new:", cas.Stat.Generation, "old:", oldCas.Stat.Generation)
 		}
 
-		stat, err := s.GetStat(nd)
-		ne("Error GetStat /foo/bar:", err)
-		if cas.Stat != stat {
-			t.Error("GetStat did not equal GetContentAndStat")
-		}
-
 		oldCas = cas
 	}
 }
@@ -137,12 +131,6 @@ func DoServerTest_OpenReadOnly(t *testing.T, s Server) {
 	ne("Error GetContentAndStat /foo/bar:", err)
 	if cas != oldCas {
 		t.Error("Erroneously modified node from read only descriptor")
-	}
-
-	stat, err := s.GetStat(nd)
-	ne("Error GetStat /foo/bar:", err)
-	if cas.Stat != stat {
-		t.Error("GetStat did not equal GetContentAndStat")
 	}
 
 	err = s.Acquire(nd)

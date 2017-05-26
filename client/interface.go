@@ -19,7 +19,6 @@ type Locker interface {
 
 type File interface {
 	GetContentAndStat() (server.NodeContentAndStat, error)
-	GetStat() (server.NodeStat, error)
 	SetContent(contents string, generation uint64) (bool, error)
 }
 

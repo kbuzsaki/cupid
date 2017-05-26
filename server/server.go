@@ -145,20 +145,6 @@ func (s *serverImpl) GetContentAndStat(nd NodeDescriptor) (NodeContentAndStat, e
 	}, nil
 }
 
-func (s *serverImpl) GetStat(nd NodeDescriptor) (NodeStat, error) {
-	nid := s.descriptors.GetDescriptor(nd.descriptor)
-	if nid == nil {
-		return NodeStat{}, ErrInvalidNodeDescriptor
-	}
-
-	_, lastModified, generation := nid.ni.GetContent()
-
-	return NodeStat{
-		Generation:   generation,
-		LastModified: lastModified,
-	}, nil
-}
-
 func (s *serverImpl) SetContent(nd NodeDescriptor, content string, generation uint64) (bool, error) {
 	nid := s.descriptors.GetDescriptor(nd.descriptor)
 	if nid == nil {
