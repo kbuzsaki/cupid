@@ -4,75 +4,102 @@ import "sync"
 
 type descriptorKey uint64
 
-type sessionDescriptor struct {
-	*nodeDescriptorMap
+type clientSession struct {
+	lock      sync.RWMutex
+	data      map[descriptorKey]*nodeDescriptor
+	ndsByPath map[string][]*nodeDescriptor
+	nextKey   descriptorKey
+
+	signaler Signaler
+}
+
+func newClientSession() *clientSession {
+	return &clientSession{
+		data:      make(map[descriptorKey]*nodeDescriptor),
+		ndsByPath: make(map[string][]*nodeDescriptor),
+		signaler:  NewSignaler(),
+	}
+}
+
+func (cs *clientSession) GetDescriptor(key descriptorKey) *nodeDescriptor {
+	if cs == nil {
+		return nil
+	}
+
+	cs.lock.RLock()
+	defer cs.lock.RUnlock()
+
+	return cs.data[key]
+}
+
+func (cs *clientSession) GetDescriptors(path string) []*nodeDescriptor {
+	if cs == nil {
+		return nil
+	}
+
+	cs.lock.RLock()
+	defer cs.lock.RUnlock()
+
+	return cs.ndsByPath[path]
+}
+
+func (cs *clientSession) OpenDescriptor(ni *nodeInfo, readOnly bool) descriptorKey {
+	cs.lock.Lock()
+	defer cs.lock.Unlock()
+	cs.nextKey++
+	nd := &nodeDescriptor{cs, ni, readOnly}
+	cs.data[cs.nextKey] = nd
+	cs.ndsByPath[ni.path] = append(cs.ndsByPath[ni.path], nd)
+	return cs.nextKey
+}
+
+func (cs *clientSession) CloseDescriptor(key descriptorKey) {
+	cs.lock.Lock()
+	defer cs.lock.Unlock()
+	delete(cs.data, key)
 }
 
 type sessionDescriptorMap struct {
 	lock    sync.RWMutex
-	data    map[descriptorKey]*sessionDescriptor
+	data    map[descriptorKey]*clientSession
 	nextKey descriptorKey
 }
 
 func makeSessionDescriptorMap() *sessionDescriptorMap {
-	return &sessionDescriptorMap{data: make(map[descriptorKey]*sessionDescriptor)}
+	return &sessionDescriptorMap{data: make(map[descriptorKey]*clientSession)}
 }
 
 func (sdm *sessionDescriptorMap) GetDescriptor(nd NodeDescriptor) *nodeDescriptor {
 	return sdm.GetSession(nd.Session.Descriptor).GetDescriptor(nd.Descriptor)
 }
 
-func (sdm *sessionDescriptorMap) GetSession(key descriptorKey) *sessionDescriptor {
+func (sdm *sessionDescriptorMap) GetSession(key descriptorKey) *clientSession {
 	sdm.lock.RLock()
 	defer sdm.lock.RUnlock()
 	return sdm.data[key]
+}
+
+func (sdm *sessionDescriptorMap) GetSessionDescriptors() []descriptorKey {
+	sdm.lock.RLock()
+	defer sdm.lock.RUnlock()
+
+	var sds []descriptorKey
+	for key := range sdm.data {
+		sds = append(sds, key)
+	}
+	return sds
 }
 
 func (sdm *sessionDescriptorMap) OpenSession() descriptorKey {
 	sdm.lock.Lock()
 	defer sdm.lock.Unlock()
 	sdm.nextKey++
-	sdm.data[sdm.nextKey] = &sessionDescriptor{nodeDescriptorMap: makeNodeDescriptorMap()}
+	sdm.data[sdm.nextKey] = newClientSession()
 	return sdm.nextKey
 }
 
 type nodeDescriptor struct {
+	cs       *clientSession
 	ni       *nodeInfo
 	readOnly bool
-}
-
-// maps aren't safe for concurrent access, so guard mutations with a RWMutex
-type nodeDescriptorMap struct {
-	lock    sync.RWMutex
-	data    map[descriptorKey]*nodeDescriptor
-	nextKey descriptorKey
-}
-
-func makeNodeDescriptorMap() *nodeDescriptorMap {
-	return &nodeDescriptorMap{data: make(map[descriptorKey]*nodeDescriptor)}
-}
-
-func (nid *nodeDescriptorMap) GetDescriptor(key descriptorKey) *nodeDescriptor {
-	if nid == nil {
-		return nil
-	}
-
-	nid.lock.RLock()
-	defer nid.lock.RUnlock()
-
-	return nid.data[key]
-}
-
-func (nid *nodeDescriptorMap) OpenDescriptor(ni *nodeInfo, readOnly bool) descriptorKey {
-	nid.lock.Lock()
-	defer nid.lock.Unlock()
-	nid.nextKey++
-	nid.data[nid.nextKey] = &nodeDescriptor{ni, readOnly}
-	return nid.nextKey
-}
-
-func (nid *nodeDescriptorMap) CloseDescriptor(key descriptorKey) {
-	nid.lock.Lock()
-	defer nid.lock.Unlock()
-	delete(nid.data, key)
 }

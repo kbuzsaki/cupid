@@ -64,8 +64,16 @@ func (s *serverImpl) KeepAlive(li LeaseInfo, eis []EventInfo, keepAliveDelay tim
 		return events, nil
 	}
 
-	// TODO: maybe wake up early when events happen?
-	time.Sleep(minTime(keepAliveDelay))
+	// TODO: check events after calling reset but before listening on DoneChan
+	// in case an event happened in between KeepAlive
+	session := s.sessions.GetSession(li.Session.Descriptor)
+	session.signaler.Reset()
+	select {
+	case <-time.Tick(minTime(keepAliveDelay)):
+		// timeout
+	case <-session.signaler.DoneChan():
+		// signaled
+	}
 
 	for _, ei := range eis {
 		// TODO: maybe check nd validity earlier so that the error doesn't wait a second before being sent
@@ -162,6 +170,11 @@ func (s *serverImpl) SetContent(nd NodeDescriptor, content string, generation ui
 		return false, ErrInvalidNodeDescriptor
 	} else if nid.readOnly {
 		return false, ErrReadOnlyNodeDescriptor
+	}
+
+	sds := s.sessions.GetSessionDescriptors()
+	for _, sd := range sds {
+		s.sessions.GetSession(sd).signaler.Signal()
 	}
 
 	return nid.ni.SetContent(content, generation), nil

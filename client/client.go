@@ -97,7 +97,9 @@ func (cl *clientImpl) keepAlive() {
 		before := time.Now()
 
 		// TODO: make an actual LeaseInfo
-		events, err := cl.s.KeepAlive(cl.locks.GetLeaseInfo(), cl.nodeCache.GetEventInfos(), cl.keepAliveDelay)
+		li := cl.locks.GetLeaseInfo()
+		li.Session = cl.sd
+		events, err := cl.s.KeepAlive(li, cl.nodeCache.GetEventInfos(), cl.keepAliveDelay)
 		if err != nil {
 			log.Println("KeepAlive error:", err)
 			time.Sleep(connectionErrorBackoff)

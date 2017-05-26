@@ -28,6 +28,7 @@ type NodeDescriptor struct {
 
 // LeaseInfo represents a session and the locks tha a session thinks it holds
 type LeaseInfo struct {
+	Session SessionDescriptor
 	// list of locks
 	LockedNodes []NodeDescriptor
 }

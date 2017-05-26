@@ -134,7 +134,7 @@ func (c *Channel) registerChatter(chatter string, announce bool) {
 func main() {
 	parseArgs()
 
-	cl, err := client.New(addr, 100*time.Millisecond)
+	cl, err := client.New(addr, 5*time.Second)
 	if err != nil {
 		log.Fatal("error opening client:", err)
 	}

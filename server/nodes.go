@@ -16,6 +16,7 @@ var (
 )
 
 type nodeInfo struct {
+	path         string
 	content      string
 	lastModified time.Time
 	generation   uint64
