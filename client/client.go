@@ -23,6 +23,7 @@ type clientImpl struct {
 	locks     lockSet
 
 	keepAliveDelay time.Duration
+	subscriber Subscriber
 }
 
 // TODO: accept a config file instead?
@@ -44,6 +45,11 @@ func newFromServer(s server.Server, keepAliveDelay time.Duration) (Client, error
 		locks:          newLockSet(),
 		keepAliveDelay: keepAliveDelay,
 	}
+	subscriber, err := NewSubscriber(cl)
+	if err != nil {
+		return nil, err
+	}
+	cl.subscriber = subscriber
 	go cl.keepAlive()
 
 	return cl, nil
@@ -51,6 +57,10 @@ func newFromServer(s server.Server, keepAliveDelay time.Duration) (Client, error
 
 func (cl *clientImpl) GetEventsOut() <-chan server.Event {
 	return cl.eventsOut
+}
+
+func (cl *clientImpl) register(nd server.NodeDescriptor, cb SubscriberCallback) {
+	cl.subscriber.Register(nd.Path(), cb)
 }
 
 func (cl *clientImpl) handleEvents(events []server.Event) {
@@ -190,4 +200,8 @@ func (nh *nodeHandleImpl) Delete() error {
 
 func (nh *nodeHandleImpl) Path() string {
 	return nh.nd.Path()
+}
+
+func (nh *nodeHandleImpl) Register(cb SubscriberCallback) {
+	nh.cl.register(nh.nd, cb)
 }

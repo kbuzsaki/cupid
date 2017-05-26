@@ -29,4 +29,5 @@ type NodeHandle interface {
 	File
 	Delete() error
 	Path() string
+	Register(cb SubscriberCallback)
 }
