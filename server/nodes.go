@@ -8,7 +8,7 @@ import (
 )
 
 const (
-	timeoutThreshold = 3 * time.Second
+	timeoutThreshold = 3 * maxKeepAliveDelay
 )
 
 var (

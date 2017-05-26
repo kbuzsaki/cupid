@@ -296,7 +296,7 @@ func printEvents(in <-chan server.Event) {
 func main() {
 	args := parseArgs()
 
-	tmp_cl, err := client.New(addr)
+	tmp_cl, err := client.New(addr, 5)
 	if err != nil {
 		log.Fatalf("error initializing client: %v\n", err)
 	}

@@ -1,16 +1,20 @@
 package rpcclient
 
-import "github.com/kbuzsaki/cupid/server"
+import (
+	"time"
+
+	"github.com/kbuzsaki/cupid/server"
+)
 
 type clientGlue struct {
 	delegate RPCServer
 }
 
-func New(addr string) server.Server {
-	return &clientGlue{NewClient(addr)}
+func New(addr string, keepAliveDelay time.Duration) server.Server {
+	return &clientGlue{NewClient(addr, keepAliveDelay)}
 }
 
-func (cg *clientGlue) KeepAlive(li server.LeaseInfo, eventsInfo []server.EventInfo) ([]server.Event, error) {
+func (cg *clientGlue) KeepAlive(li server.LeaseInfo, eventsInfo []server.EventInfo, keepAliveDelay time.Duration) ([]server.Event, error) {
 
 	leases := []string{}
 	events := []server.Event{}
@@ -20,7 +24,7 @@ func (cg *clientGlue) KeepAlive(li server.LeaseInfo, eventsInfo []server.EventIn
 		leases = append(leases, lease)
 	}
 
-	args := KeepAliveArgs{leases, eventsInfo}
+	args := KeepAliveArgs{leases, eventsInfo, keepAliveDelay}
 	err := cg.delegate.KeepAlive(&args, &events)
 
 	if err != nil {

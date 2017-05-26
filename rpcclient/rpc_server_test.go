@@ -33,7 +33,7 @@ func TestRPC_KeepAlive(t *testing.T) {
 		t.Fatal("Could not launch rpc server")
 	}
 
-	cl := New(addr)
+	cl := New(addr, 1)
 
 	server.DoServerTest_KeepAlive(t, cl)
 }
@@ -56,7 +56,7 @@ func TestRPC_OpenGetSet(t *testing.T) {
 		t.Fatal("Could not launch rpc server")
 	}
 
-	cl := New(addr)
+	cl := New(addr, 1)
 
 	server.DoServerTest_OpenGetSet(t, cl)
 }
@@ -79,7 +79,7 @@ func TestRPC_OpenReadOnly(t *testing.T) {
 		t.Fatal("Could not launch rpc server")
 	}
 
-	cl := New(addr)
+	cl := New(addr, 1)
 
 	server.DoServerTest_OpenReadOnly(t, cl)
 }
@@ -102,7 +102,7 @@ func TestRPC_SetContentGeneration(t *testing.T) {
 		t.Fatal("Could not launch rpc server")
 	}
 
-	cl := New(addr)
+	cl := New(addr, 1)
 
 	server.DoServerTest_SetContentGeneration(t, cl)
 }
@@ -125,7 +125,7 @@ func TestRPC_ConcurrentOpen(t *testing.T) {
 		t.Fatal("Could not launch rpc server")
 	}
 
-	cl := New(addr)
+	cl := New(addr, 1)
 
 	server.DoServerTest_ConcurrentOpen(t, cl)
 }
@@ -148,7 +148,7 @@ func TestRPC_TryAcquire(t *testing.T) {
 		t.Fatal("Could not launch rpc server")
 	}
 
-	cl := New(addr)
+	cl := New(addr, 1)
 
 	server.DoServerTest_TryAcquire(t, cl)
 }
@@ -171,7 +171,7 @@ func TestRPC_BadRelease(t *testing.T) {
 		t.Fatal("Could not launch rpc server")
 	}
 
-	cl := New(addr)
+	cl := New(addr, 1)
 
 	server.DoServerTest_BadRelease(t, cl)
 }

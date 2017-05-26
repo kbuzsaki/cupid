@@ -21,25 +21,28 @@ type clientImpl struct {
 
 	nodeCache nodeCache
 	locks     lockSet
+
+	keepAliveDelay time.Duration
 }
 
 // TODO: accept a config file instead?
-func New(addr string) (Client, error) {
-	s := rpcclient.New(addr)
-	return newFromServer(s)
+func New(addr string, keepAliveDelay time.Duration) (Client, error) {
+	s := rpcclient.New(addr, keepAliveDelay)
+	return newFromServer(s, keepAliveDelay)
 }
 
-func newFromServer(s server.Server) (Client, error) {
+func newFromServer(s server.Server, keepAliveDelay time.Duration) (Client, error) {
 	eventsIn := make(chan server.Event)
 	eventsOut := make(chan server.Event)
 	go BufferEvents(eventsIn, eventsOut)
 
 	cl := &clientImpl{
-		s:         s,
-		eventsIn:  eventsIn,
-		eventsOut: eventsOut,
-		nodeCache: newNodeCache(),
-		locks:     newLockSet(),
+		s:              s,
+		eventsIn:       eventsIn,
+		eventsOut:      eventsOut,
+		nodeCache:      newNodeCache(),
+		locks:          newLockSet(),
+		keepAliveDelay: keepAliveDelay,
 	}
 	go cl.keepAlive()
 
@@ -76,7 +79,7 @@ func (cl *clientImpl) keepAlive() {
 		before := time.Now()
 
 		// TODO: make an actual LeaseInfo
-		events, err := cl.s.KeepAlive(cl.locks.GetLeaseInfo(), cl.nodeCache.GetEventInfos())
+		events, err := cl.s.KeepAlive(cl.locks.GetLeaseInfo(), cl.nodeCache.GetEventInfos(), cl.keepAliveDelay)
 		if err != nil {
 			log.Println("KeepAlive error:", err)
 			time.Sleep(connectionErrorBackoff)

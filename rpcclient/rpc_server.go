@@ -3,6 +3,8 @@ package rpcclient
 import (
 	"errors"
 
+	"time"
+
 	"github.com/kbuzsaki/cupid/server"
 )
 
@@ -20,8 +22,9 @@ type RPCServer interface {
 }
 
 type KeepAliveArgs struct {
-	LeaseInfo  []string
-	EventsInfo []server.EventInfo
+	LeaseInfo      []string
+	EventsInfo     []server.EventInfo
+	keepAliveDelay time.Duration
 }
 
 type OpenArgs struct {
@@ -58,7 +61,7 @@ func (rs *rpcServer) KeepAlive(args *KeepAliveArgs, events *[]server.Event) erro
 
 	}
 
-	tmp_events, err := rs.delegate.KeepAlive(leases, args.EventsInfo)
+	tmp_events, err := rs.delegate.KeepAlive(leases, args.EventsInfo, args.keepAliveDelay)
 
 	if err != nil {
 		return err

@@ -4,6 +4,8 @@ import (
 	"net/rpc"
 	"sync"
 
+	"time"
+
 	"github.com/kbuzsaki/cupid/server"
 )
 
@@ -13,11 +15,12 @@ var (
 )
 
 type client struct {
-	addr string
+	addr           string
+	keepAliveDelay time.Duration
 }
 
-func NewClient(addr string) RPCServer {
-	return &client{addr}
+func NewClient(addr string, keepAliveDelay time.Duration) RPCServer {
+	return &client{addr, keepAliveDelay}
 }
 
 func connAlive(conn *rpc.Client) bool {

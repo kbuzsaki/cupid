@@ -6,7 +6,7 @@ import (
 )
 
 const (
-	keepAliveSleep = 1 * time.Second
+	maxKeepAliveDelay = 30 * time.Second
 )
 
 var (
@@ -27,7 +27,15 @@ func New() (Server, error) {
 	}, nil
 }
 
-func (s *serverImpl) KeepAlive(li LeaseInfo, eis []EventInfo) ([]Event, error) {
+func minTime(keepAliveDelay time.Duration) time.Duration {
+	if keepAliveDelay > maxKeepAliveDelay {
+		return maxKeepAliveDelay
+	}
+
+	return keepAliveDelay
+}
+
+func (s *serverImpl) KeepAlive(li LeaseInfo, eis []EventInfo, keepAliveDelay time.Duration) ([]Event, error) {
 	defer func() {
 		for _, nd := range li.LockedNodes {
 			nid := s.descriptors.GetDescriptor(nd.descriptor)
@@ -56,7 +64,7 @@ func (s *serverImpl) KeepAlive(li LeaseInfo, eis []EventInfo) ([]Event, error) {
 	}
 
 	// TODO: maybe wake up early when events happen?
-	time.Sleep(keepAliveSleep)
+	time.Sleep(minTime(keepAliveDelay))
 
 	for _, ei := range eis {
 		// TODO: maybe check nd validity earlier so that the error doesn't wait a second before being sent

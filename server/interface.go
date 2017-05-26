@@ -7,7 +7,7 @@ import (
 )
 
 type Server interface {
-	KeepAlive(li LeaseInfo, eis []EventInfo) ([]Event, error)
+	KeepAlive(li LeaseInfo, eis []EventInfo, keepAliveDelay time.Duration) ([]Event, error)
 
 	Open(path string, readOnly bool, events EventsConfig) (NodeDescriptor, error)
 

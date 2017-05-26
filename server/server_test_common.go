@@ -12,7 +12,7 @@ func DoServerTest_KeepAlive(t *testing.T, s Server) {
 		}
 	}
 
-	events, err := s.KeepAlive(LeaseInfo{}, nil)
+	events, err := s.KeepAlive(LeaseInfo{}, nil, 1)
 	ne("KeepAlive with Empty LeaseInfo", err)
 	if len(events) != 0 {
 		t.Error("Got events, expected none: ", events)
@@ -24,7 +24,7 @@ func DoServerTest_KeepAlive(t *testing.T, s Server) {
 
 	// expect to get lock invalidation event
 	bogusLeaseInfo := LeaseInfo{[]NodeDescriptor{nd}}
-	events, err = s.KeepAlive(bogusLeaseInfo, nil)
+	events, err = s.KeepAlive(bogusLeaseInfo, nil, 1)
 	ne("KeepAlive with bogus LeaseInfo", err)
 	if len(events) != 1 {
 		t.Error("Got incorrect number of events, expected 1: ", events)
@@ -46,7 +46,7 @@ func DoServerTest_KeepAlive(t *testing.T, s Server) {
 	}
 
 	goodLeaseInfo := LeaseInfo{[]NodeDescriptor{nd}}
-	events, err = s.KeepAlive(goodLeaseInfo, nil)
+	events, err = s.KeepAlive(goodLeaseInfo, nil, 1)
 	ne("KeepAlive with good LeaseInfo", err)
 	if len(events) != 0 {
 		t.Error("Got events with good LeaseInfo, expected none: ", events)
