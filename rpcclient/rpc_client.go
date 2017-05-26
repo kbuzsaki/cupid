@@ -24,7 +24,9 @@ func NewClient(addr string, keepAliveDelay time.Duration) RPCServer {
 }
 
 func connAlive(conn *rpc.Client) bool {
-	return conn.Call("Cupid.KeepAlive", nil, nil) == nil
+	var a int
+	var b int
+	return conn.Call("Cupid.Ping", &a, &b) == nil
 }
 
 func (cl *client) getConn() (*rpc.Client, error) {
@@ -42,6 +44,17 @@ func (cl *client) getConn() (*rpc.Client, error) {
 
 	pool[cl.addr] = client
 	return client, nil
+}
+
+func (cl *client) Ping(_, _ *int) error {
+	conn, err := cl.getConn()
+	if err != nil {
+		return err
+	}
+	var a int
+	var b int
+
+	return conn.Call("Cupid.Ping", &a, &b)
 }
 
 func (cl *client) KeepAlive(args *KeepAliveArgs, events *[]server.Event) error {

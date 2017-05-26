@@ -23,7 +23,7 @@ type clientImpl struct {
 	locks     lockSet
 
 	keepAliveDelay time.Duration
-	subscriber Subscriber
+	subscriber     Subscriber
 }
 
 // TODO: accept a config file instead?

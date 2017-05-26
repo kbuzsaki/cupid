@@ -34,6 +34,8 @@ func ServeCupidRPC(s server.Server, addr string, ready chan bool) {
 			break
 		}
 
+		log.Println("Accepting new connection from:", conn.RemoteAddr())
+
 		go rpcServer.ServeConn(conn)
 	}
 

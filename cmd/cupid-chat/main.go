@@ -8,11 +8,13 @@ import (
 	"strings"
 	"sync"
 
+	"bufio"
+	"math"
+	"os"
+	"time"
+
 	"github.com/kbuzsaki/cupid/client"
 	"github.com/kbuzsaki/cupid/server"
-	"bufio"
-	"os"
-	"math"
 )
 
 var (
@@ -78,6 +80,7 @@ type message struct {
 
 type Channel struct {
 	cl       client.Client
+	nick     string
 	messages chan message
 
 	lock     sync.Mutex
@@ -86,22 +89,34 @@ type Channel struct {
 
 func (c *Channel) printMessages() {
 	for m := range c.messages {
-		fmt.Println(m.sender + ": " + m.body + "\n> ")
+		if m.sender == c.nick {
+			continue
+		}
+
+		fmt.Print(m.sender + ": " + m.body + "> ")
 	}
 }
 
-func (c *Channel) registerChatter(chatter string) {
+func (c *Channel) registerChatter(chatter string, announce bool) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
-	if _, ok := c.chatters[chatter]; ok {
+	chatter = strings.Trim(chatter, " ")
+	if _, ok := c.chatters[chatter]; ok || c.nick == chatter || chatter == "" {
 		return
 	}
 	c.chatters[chatter] = struct{}{}
 
-
-	chatterHandle, err := c.cl.Open(channel + "/" + chatter, true, server.EventsConfig{})
+	chatterHandle, err := c.cl.Open(channel+"/"+chatter, true, server.EventsConfig{})
 	if err != nil {
 		log.Fatal("unable to open chatter handle:", err)
+	}
+	_, err = chatterHandle.GetContentAndStat()
+	if err != nil {
+		log.Fatal("unable to get chatter contents")
+	}
+
+	if announce {
+		c.messages <- message{sender: "system", body: chatter + " joined!\n"}
 	}
 
 	chatterHandle.Register(func(path string, cas server.NodeContentAndStat) {
@@ -119,13 +134,13 @@ func (c *Channel) registerChatter(chatter string) {
 func main() {
 	parseArgs()
 
-	cl, err := client.New(addr)
+	cl, err := client.New(addr, 100*time.Millisecond)
 	if err != nil {
 		log.Fatal("error opening client:", err)
 	}
 
 	messages := make(chan message, 100)
-	ch := Channel{cl: cl, messages: messages, chatters: make(map[string]struct{})}
+	ch := Channel{cl: cl, nick: nick, messages: messages, chatters: make(map[string]struct{})}
 	go ch.printMessages()
 
 	chanHandle, err := cl.Open(channel, false, server.EventsConfig{})
@@ -138,13 +153,13 @@ func main() {
 	}
 
 	for _, chatter := range chatters {
-		ch.registerChatter(chatter)
+		ch.registerChatter(chatter, false)
 	}
 
 	chanHandle.Register(func(path string, cas server.NodeContentAndStat) {
 		chatters := strings.Split(cas.Content, "\n")
 		for _, chatter := range chatters {
-			ch.registerChatter(chatter)
+			ch.registerChatter(chatter, true)
 		}
 	})
 
@@ -154,7 +169,7 @@ func main() {
 		log.Fatal("error opening nick:", err)
 	}
 
-
+	fmt.Println("> you joined '" + channel + "' as '" + nick + "'")
 	reader := bufio.NewReader(os.Stdin)
 	for {
 		fmt.Print("> ")

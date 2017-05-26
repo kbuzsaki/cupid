@@ -9,6 +9,8 @@ import (
 )
 
 type RPCServer interface {
+	Ping(_, _ *int) error
+
 	KeepAlive(args *KeepAliveArgs, events *[]server.Event) error
 	Open(args *OpenArgs, nd *server.NodeDescriptor) error
 
@@ -24,7 +26,7 @@ type RPCServer interface {
 type KeepAliveArgs struct {
 	LeaseInfo      []string
 	EventsInfo     []server.EventInfo
-	keepAliveDelay time.Duration
+	KeepAliveDelay time.Duration
 }
 
 type OpenArgs struct {
@@ -47,6 +49,10 @@ func NewServer(delegate server.Server) RPCServer {
 	return &rpcServer{delegate}
 }
 
+func (rs *rpcServer) Ping(_, _ *int) error {
+	return nil
+}
+
 func (rs *rpcServer) KeepAlive(args *KeepAliveArgs, events *[]server.Event) error {
 
 	leases := server.LeaseInfo{}
@@ -61,7 +67,7 @@ func (rs *rpcServer) KeepAlive(args *KeepAliveArgs, events *[]server.Event) erro
 
 	}
 
-	tmp_events, err := rs.delegate.KeepAlive(leases, args.EventsInfo, args.keepAliveDelay)
+	tmp_events, err := rs.delegate.KeepAlive(leases, args.EventsInfo, args.KeepAliveDelay)
 
 	if err != nil {
 		return err
