@@ -1,9 +1,10 @@
 package main
 
 import (
-	"log"
-
 	"flag"
+	"log"
+	"net/http"
+	_ "net/http/pprof"
 
 	"github.com/kbuzsaki/cupid/rpcclient"
 	"github.com/kbuzsaki/cupid/server"
@@ -32,6 +33,8 @@ func parseArgs() {
 
 func main() {
 	parseArgs()
+
+	go http.ListenAndServe("localhost:6060", nil)
 
 	s, err := server.New()
 	if err != nil {
