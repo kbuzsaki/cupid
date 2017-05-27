@@ -2,6 +2,7 @@ package server
 
 import (
 	"errors"
+	"log"
 	"time"
 )
 
@@ -45,7 +46,18 @@ func (s *serverImpl) KeepAlive(li LeaseInfo, eis []EventInfo, keepAliveDelay tim
 			}
 		}
 	}()
+
+	session := s.sessions.GetSession(li.Session.Descriptor)
+
+	// now that we're back, we have to ack everything
+	for _, ackChan := range session.ackChans {
+		log.Println("acking for session:", li)
+		close(ackChan)
+	}
+	session.ackChans = nil
+
 	// check if you own all the locks you think you own
+	// TODO: move lock timeouts to event stuff?
 	var events []Event
 	for _, nd := range li.LockedNodes {
 		nid := s.sessions.GetDescriptor(nd)
@@ -66,29 +78,14 @@ func (s *serverImpl) KeepAlive(li LeaseInfo, eis []EventInfo, keepAliveDelay tim
 
 	// TODO: check events after calling reset but before listening on DoneChan
 	// in case an event happened in between KeepAlive
-	session := s.sessions.GetSession(li.Session.Descriptor)
-	session.signaler.Reset()
+
 	select {
 	case <-time.Tick(minTime(keepAliveDelay)):
 		// timeout
-	case <-session.signaler.DoneChan():
-		// signaled
-	}
-
-	for _, ei := range eis {
-		// TODO: maybe check nd validity earlier so that the error doesn't wait a second before being sent
-		cas, err := s.GetContentAndStat(ei.Descriptor)
-		if err != nil {
-			return nil, err
-		}
-
-		if cas.Stat.Generation > ei.Generation {
-			if ei.Push {
-				events = append(events, ContentInvalidationPushEvent{ei.Descriptor, cas})
-			} else {
-				events = append(events, ContentInvalidationEvent{ei.Descriptor})
-			}
-		}
+	case se := <-session.events:
+		log.Println("got se:", se)
+		session.ackChans = append(session.ackChans, se.ackChan)
+		events = append(events, se.event)
 	}
 
 	return events, nil
@@ -172,13 +169,24 @@ func (s *serverImpl) SetContent(nd NodeDescriptor, content string, generation ui
 		return false, ErrReadOnlyNodeDescriptor
 	}
 
+	// TODO: fix race condition with concurrent gets here
+	ok := nid.ni.SetContent(content, generation)
+	if !ok {
+		return false, nil
+	}
+
+	cas := nid.ni.GetContentAndStat()
+
 	sds := s.sessions.GetSessionDescriptors()
 	for _, sd := range sds {
 		session := s.sessions.GetSession(sd)
-		if len(session.GetDescriptors(nd.Path)) > 0 {
-			session.signaler.Signal()
+		keys := session.GetDescriptorKeys(nd.Path)
+
+		for _, key := range keys {
+			snd := NodeDescriptor{SessionDescriptor{session.key}, key, nd.Path}
+			session.InvalidateCache(snd, cas)
 		}
 	}
 
-	return nid.ni.SetContent(content, generation), nil
+	return true, nil
 }

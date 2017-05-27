@@ -32,6 +32,17 @@ func (ni *nodeInfo) GetContent() (string, time.Time, uint64) {
 	return ni.content, ni.lastModified, ni.generation
 }
 
+func (ni *nodeInfo) GetContentAndStat() NodeContentAndStat {
+	content, lastModified, generation := ni.GetContent()
+	return NodeContentAndStat{
+		content,
+		NodeStat{
+			generation,
+			lastModified,
+		},
+	}
+}
+
 func (ni *nodeInfo) SetContent(content string, generation uint64) bool {
 	ni.lock.Lock()
 	defer ni.lock.Unlock()

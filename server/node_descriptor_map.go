@@ -1,23 +1,60 @@
 package server
 
-import "sync"
+import (
+	"log"
+	"sync"
+	"time"
+)
+
+const (
+	sessionTimeout = 5 * time.Second
+)
 
 type descriptorKey uint64
 
-type clientSession struct {
-	lock      sync.RWMutex
-	data      map[descriptorKey]*nodeDescriptor
-	ndsByPath map[string][]*nodeDescriptor
-	nextKey   descriptorKey
-
-	signaler Signaler
+type sessionEvent struct {
+	event   ContentInvalidationPushEvent
+	ackChan chan struct{}
 }
 
-func newClientSession() *clientSession {
+type clientSession struct {
+	key descriptorKey
+
+	lock      sync.RWMutex
+	data      map[descriptorKey]*nodeDescriptor
+	ndsByPath map[string][]descriptorKey
+	nextKey   descriptorKey
+
+	events   chan sessionEvent
+	ackChans []chan struct{}
+}
+
+func newClientSession(key descriptorKey) *clientSession {
 	return &clientSession{
+		key:       key,
 		data:      make(map[descriptorKey]*nodeDescriptor),
-		ndsByPath: make(map[string][]*nodeDescriptor),
-		signaler:  NewSignaler(),
+		ndsByPath: make(map[string][]descriptorKey),
+		events:    make(chan sessionEvent),
+	}
+}
+
+func (cs *clientSession) InvalidateCache(nd NodeDescriptor, cas NodeContentAndStat) {
+	ackChan := make(chan struct{})
+	se := sessionEvent{
+		event:   ContentInvalidationPushEvent{nd, cas},
+		ackChan: ackChan,
+	}
+
+	// we have sent the event to KeepAlive
+	cs.events <- se
+
+	// now wait for ack or timeout
+	select {
+	case <-time.Tick(sessionTimeout):
+		// TODO: do we have to clean anything up if we time out?
+		log.Println("Timed out for session:", cs.key, nd)
+	case <-ackChan:
+		// success!
 	}
 }
 
@@ -32,7 +69,7 @@ func (cs *clientSession) GetDescriptor(key descriptorKey) *nodeDescriptor {
 	return cs.data[key]
 }
 
-func (cs *clientSession) GetDescriptors(path string) []*nodeDescriptor {
+func (cs *clientSession) GetDescriptorKeys(path string) []descriptorKey {
 	if cs == nil {
 		return nil
 	}
@@ -49,7 +86,7 @@ func (cs *clientSession) OpenDescriptor(ni *nodeInfo, readOnly bool) descriptorK
 	cs.nextKey++
 	nd := &nodeDescriptor{cs, ni, readOnly}
 	cs.data[cs.nextKey] = nd
-	cs.ndsByPath[ni.path] = append(cs.ndsByPath[ni.path], nd)
+	cs.ndsByPath[ni.path] = append(cs.ndsByPath[ni.path], cs.nextKey)
 	return cs.nextKey
 }
 
@@ -94,7 +131,7 @@ func (sdm *sessionDescriptorMap) OpenSession() descriptorKey {
 	sdm.lock.Lock()
 	defer sdm.lock.Unlock()
 	sdm.nextKey++
-	sdm.data[sdm.nextKey] = newClientSession()
+	sdm.data[sdm.nextKey] = newClientSession(sdm.nextKey)
 	return sdm.nextKey
 }
 
