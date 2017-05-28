@@ -38,6 +38,10 @@ func newClientSession(key descriptorKey) *clientSession {
 	}
 }
 
+func (cs *clientSession) GetSD() SessionDescriptor {
+	return SessionDescriptor{cs.key}
+}
+
 func (cs *clientSession) InvalidateCache(nd NodeDescriptor, cas NodeContentAndStat) {
 	ackChan := make(chan struct{})
 	se := sessionEvent{
@@ -84,7 +88,7 @@ func (cs *clientSession) OpenDescriptor(ni *nodeInfo, readOnly bool) descriptorK
 	cs.lock.Lock()
 	defer cs.lock.Unlock()
 	cs.nextKey++
-	nd := &nodeDescriptor{cs, ni, readOnly}
+	nd := &nodeDescriptor{cs, cs.nextKey, ni, readOnly}
 	cs.data[cs.nextKey] = nd
 	cs.ndsByPath[ni.path] = append(cs.ndsByPath[ni.path], cs.nextKey)
 	return cs.nextKey
@@ -137,6 +141,11 @@ func (sdm *sessionDescriptorMap) OpenSession() descriptorKey {
 
 type nodeDescriptor struct {
 	cs       *clientSession
+	key      descriptorKey
 	ni       *nodeInfo
 	readOnly bool
+}
+
+func (nd *nodeDescriptor) GetND() NodeDescriptor {
+	return NodeDescriptor{nd.cs.GetSD(), nd.key, nd.ni.path}
 }

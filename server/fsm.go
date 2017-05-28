@@ -10,8 +10,8 @@ type FSM interface {
 	OpenNode(sd SessionDescriptor, path string, readOnly bool) NodeDescriptor
 	GetNodeDescriptor(nd NodeDescriptor) *nodeDescriptor
 
-	TryAcquire(nd NodeDescriptor) bool
-	Release(nd NodeDescriptor) bool
+	SetLocked(nd NodeDescriptor)
+	ReleaseLock(nd NodeDescriptor) bool
 
 	GetContentAndStat(nd NodeDescriptor) NodeContentAndStat
 	SetContent(nd NodeDescriptor, cas NodeContentAndStat) bool
@@ -56,17 +56,17 @@ func (fsm *fsmImpl) GetNodeDescriptor(nd NodeDescriptor) *nodeDescriptor {
 	return fsm.sessions.GetDescriptor(nd)
 }
 
-func (fsm *fsmImpl) TryAcquire(nd NodeDescriptor) bool {
+func (fsm *fsmImpl) SetLocked(nd NodeDescriptor) {
 	nid := fsm.sessions.GetDescriptor(nd)
 	if nid == nil {
 		log.Println("fsm.TryAcquire got invalid node descriptor:", nd)
-		return false
+		return
 	}
 
-	return nid.ni.TryAcquire(nid)
+	nid.ni.SetLocked(nid)
 }
 
-func (fsm *fsmImpl) Release(nd NodeDescriptor) bool {
+func (fsm *fsmImpl) ReleaseLock(nd NodeDescriptor) bool {
 	nid := fsm.sessions.GetDescriptor(nd)
 	if nid == nil {
 		log.Println("fsm.Release got invalid node descriptor:", nd)

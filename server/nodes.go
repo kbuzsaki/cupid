@@ -64,6 +64,13 @@ func (ni *nodeInfo) Acquire(locker *nodeDescriptor) {
 	}
 }
 
+func (ni *nodeInfo) SetLocked(locker *nodeDescriptor) {
+	ni.lock.Lock()
+	defer ni.lock.Unlock()
+
+	ni.locker = locker
+}
+
 func (ni *nodeInfo) TryAcquire(locker *nodeDescriptor) bool {
 	ni.lock.Lock()
 	defer ni.lock.Unlock()

@@ -12,12 +12,13 @@ type pendingEvent struct {
 
 // TODO: when an event times out, put the session into a "dead" state until next keepalive so we don't waste timouts on it
 type sessionConn struct {
+	aliveLock     sync.Mutex
 	inKeepAlive   bool
 	lastKeepAlive time.Time
 
-	lock    sync.Mutex
-	pending []pendingEvent
-	ackCs   []chan struct{}
+	eventLock sync.Mutex
+	pending   []pendingEvent
+	ackCs     []chan struct{}
 
 	signaler Signaler
 }
@@ -29,35 +30,57 @@ func NewSessionConn() *sessionConn {
 }
 
 func (sc *sessionConn) EnterKeepAlive() {
+	sc.aliveLock.Lock()
+	defer sc.aliveLock.Unlock()
+
 	sc.inKeepAlive = true
 }
 
 func (sc *sessionConn) ExitKeepAlive() {
+	sc.aliveLock.Lock()
+	defer sc.aliveLock.Unlock()
+
 	sc.inKeepAlive = false
 	sc.lastKeepAlive = time.Now()
+}
+
+func (sc *sessionConn) IsAlive() bool {
+	sc.aliveLock.Lock()
+	defer sc.aliveLock.Unlock()
+
+	if sc.inKeepAlive {
+		return true
+	}
+
+	return time.Since(sc.lastKeepAlive) < timeoutThreshold
 }
 
 // SendEvent sends an event to this session and either blocks until the session acks it or times out
 func (sc *sessionConn) SendEvent(event Event) bool {
 	ac := make(chan struct{})
 
-	sc.lock.Lock()
+	sc.eventLock.Lock()
 	sc.pending = append(sc.pending, pendingEvent{event, ac})
-	sc.lock.Unlock()
+	sc.eventLock.Unlock()
 
 	sc.signaler.Signal()
+
+	if !sc.IsAlive() {
+		return false
+	}
 
 	select {
 	case <-ac:
 		return true
 	case <-time.Tick(timeoutThreshold):
+		// TODO: maybe reduce this from timeoutThreshold to (timeoutThreshold - time.Since(sc.lastKeepAlive))
 		return false
 	}
 }
 
 func (sc *sessionConn) ReadEvents() []Event {
-	sc.lock.Lock()
-	defer sc.lock.Unlock()
+	sc.eventLock.Lock()
+	defer sc.eventLock.Unlock()
 
 	var events []Event
 	for _, pe := range sc.pending {
@@ -70,8 +93,8 @@ func (sc *sessionConn) ReadEvents() []Event {
 }
 
 func (sc *sessionConn) AckEvents() {
-	sc.lock.Lock()
-	defer sc.lock.Unlock()
+	sc.eventLock.Lock()
+	defer sc.eventLock.Unlock()
 
 	for _, ackC := range sc.ackCs {
 		close(ackC)
@@ -81,8 +104,9 @@ func (sc *sessionConn) AckEvents() {
 
 // TODO: error handling
 type frontendImpl struct {
-	fsm      FSM
-	sessions AtomicMap
+	fsm       FSM
+	sessions  AtomicMap
+	lockLocks AtomicStringMap
 }
 
 func NewFrontend() (Server, error) {
@@ -93,7 +117,11 @@ func NewFrontend() (Server, error) {
 
 	c := make(chan string)
 	fsm = NewRaftFSM(c, c, fsm)
-	return &frontendImpl{fsm: fsm, sessions: NewAtomicMap()}, nil
+	return &frontendImpl{
+		fsm:       fsm,
+		sessions:  NewAtomicMap(),
+		lockLocks: NewAtomicStringMapWithDefault(func(string) interface{} { return &sync.Mutex{} }),
+	}, nil
 }
 
 func (fe *frontendImpl) KeepAlive(li LeaseInfo, eis []EventInfo, keepAliveDelay time.Duration) ([]Event, error) {
@@ -129,27 +157,47 @@ func (fe *frontendImpl) Open(sd SessionDescriptor, path string, readOnly bool, e
 }
 
 func (fe *frontendImpl) Acquire(nd NodeDescriptor) error {
-	if node := fe.fsm.GetNodeDescriptor(nd); node == nil {
-		return ErrInvalidNodeDescriptor
-	} else if node.readOnly {
-		return ErrReadOnlyNodeDescriptor
+	for {
+		locked, err := fe.TryAcquire(nd)
+		if err != nil {
+			return err
+		} else if locked {
+			return nil
+		}
 	}
-
-	locked := fe.fsm.TryAcquire(nd)
-	for !locked {
-		locked = fe.fsm.TryAcquire(nd)
-	}
-	return nil
 }
 
 func (fe *frontendImpl) TryAcquire(nd NodeDescriptor) (bool, error) {
-	if node := fe.fsm.GetNodeDescriptor(nd); node == nil {
+	var nid *nodeDescriptor
+	if nid = fe.fsm.GetNodeDescriptor(nd); nid == nil {
 		return false, ErrInvalidNodeDescriptor
-	} else if node.readOnly {
+	} else if nid.readOnly {
 		return false, ErrReadOnlyNodeDescriptor
 	}
 
-	return fe.fsm.TryAcquire(nd), nil
+	lock := fe.lockLocks.Get(nid.ni.path).(*sync.Mutex)
+	lock.Lock()
+	defer lock.Unlock()
+
+	currentLocker := nid.ni.locker
+	if currentLocker == nil {
+		// there is no locker, so take the lock
+		fe.fsm.SetLocked(nd)
+		return true, nil
+	}
+
+	lockerSession := fe.sessions.Get(uint64(currentLocker.cs.key)).(*sessionConn)
+	if !lockerSession.IsAlive() {
+		// the locker died, so take the lock and send them an event
+		// TODO: what if the leader dies here?
+		fe.fsm.SetLocked(nd)
+		lockInvalidationEvent := LockInvalidationEvent{currentLocker.GetND()}
+		lockerSession.SendEvent(lockInvalidationEvent)
+		return true, nil
+	}
+
+	// we don't get the lock :(
+	return false, nil
 }
 
 func (fe *frontendImpl) Release(nd NodeDescriptor) error {
@@ -159,7 +207,7 @@ func (fe *frontendImpl) Release(nd NodeDescriptor) error {
 		return ErrReadOnlyNodeDescriptor
 	}
 
-	if ok := fe.fsm.Release(nd); !ok {
+	if ok := fe.fsm.ReleaseLock(nd); !ok {
 		return ErrLockNotHeld
 	}
 	return nil

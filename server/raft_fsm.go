@@ -173,7 +173,7 @@ func (fsm *raftFSMImpl) GetNodeDescriptor(nd NodeDescriptor) *nodeDescriptor {
 	return fsm.delegate.GetNodeDescriptor(nd)
 }
 
-func (fsm *raftFSMImpl) TryAcquire(nd NodeDescriptor) bool {
+func (fsm *raftFSMImpl) SetLocked(nd NodeDescriptor) {
 	id := fsm.nextId()
 
 	ac := make(chan bool)
@@ -182,10 +182,10 @@ func (fsm *raftFSMImpl) TryAcquire(nd NodeDescriptor) bool {
 	proposal := TryAcquireProposal{ID: id, ND: nd}
 	fsm.proposeC <- Encode(proposal.Wrap())
 
-	return <-ac
+	<-ac
 }
 
-func (fsm *raftFSMImpl) Release(nd NodeDescriptor) bool {
+func (fsm *raftFSMImpl) ReleaseLock(nd NodeDescriptor) bool {
 	id := fsm.nextId()
 
 	ac := make(chan bool)
@@ -222,9 +222,10 @@ func (fsm *raftFSMImpl) readFromLog() {
 		case OpenNodeProposal:
 			fsm.openNodeAcks.Get(p.ID).(chan NodeDescriptor) <- fsm.delegate.OpenNode(p.SD, p.Path, p.ReadOnly)
 		case TryAcquireProposal:
-			fsm.tryAcquireAcks.Get(p.ID).(chan bool) <- fsm.delegate.TryAcquire(p.ND)
+			fsm.delegate.SetLocked(p.ND)
+			fsm.tryAcquireAcks.Get(p.ID).(chan bool) <- true
 		case ReleaseProposal:
-			fsm.releaseAcks.Get(p.ID).(chan bool) <- fsm.delegate.Release(p.ND)
+			fsm.releaseAcks.Get(p.ID).(chan bool) <- fsm.delegate.ReleaseLock(p.ND)
 		case SetContentProposal:
 			fsm.setContentAcks.Get(p.ID).(chan bool) <- fsm.delegate.SetContent(p.ND, p.CAS)
 		default:
