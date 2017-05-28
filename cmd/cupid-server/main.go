@@ -33,7 +33,7 @@ func parseArgs() {
 func main() {
 	parseArgs()
 
-	s, err := server.New()
+	s, err := server.NewFrontend()
 	if err != nil {
 		log.Fatalf("error initializing server: %v\n", err)
 	}
