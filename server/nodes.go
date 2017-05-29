@@ -2,7 +2,6 @@ package server
 
 import (
 	"errors"
-	"log"
 	"sync"
 	"time"
 )
@@ -22,23 +21,17 @@ type nodeInfo struct {
 	generation   uint64
 	lock         sync.RWMutex
 	locker       *nodeDescriptor
-	keepAlive    bool
-	lastPing     time.Time
-}
-
-func (ni *nodeInfo) GetContent() (string, time.Time, uint64) {
-	ni.lock.RLock()
-	defer ni.lock.RUnlock()
-	return ni.content, ni.lastModified, ni.generation
 }
 
 func (ni *nodeInfo) GetContentAndStat() NodeContentAndStat {
-	content, lastModified, generation := ni.GetContent()
+	ni.lock.RLock()
+	defer ni.lock.RUnlock()
+
 	return NodeContentAndStat{
-		content,
+		ni.content,
 		NodeStat{
-			generation,
-			lastModified,
+			ni.generation,
+			ni.lastModified,
 		},
 	}
 }
@@ -57,34 +50,11 @@ func (ni *nodeInfo) SetContent(content string, generation uint64) bool {
 	return true
 }
 
-func (ni *nodeInfo) Acquire(locker *nodeDescriptor) {
-	locked := ni.TryAcquire(locker)
-	for !locked {
-		locked = ni.TryAcquire(locker)
-	}
-}
-
 func (ni *nodeInfo) SetLocked(locker *nodeDescriptor) {
 	ni.lock.Lock()
 	defer ni.lock.Unlock()
 
 	ni.locker = locker
-}
-
-func (ni *nodeInfo) TryAcquire(locker *nodeDescriptor) bool {
-	ni.lock.Lock()
-	defer ni.lock.Unlock()
-
-	if ni.locker != nil && (ni.keepAlive || time.Since(ni.lastPing) < timeoutThreshold) {
-		log.Println("aborting try acquire: ", ni.keepAlive, time.Since(ni.lastPing))
-		return false
-	}
-	log.Println("taking the lock from:", ni.locker, ni.keepAlive, time.Since(ni.lastPing))
-
-	ni.locker = locker
-	ni.lastPing = time.Now()
-
-	return true
 }
 
 // TODO: add error checking for whether the caller has the lock
@@ -103,25 +73,4 @@ func (ni *nodeInfo) Release(unlocker *nodeDescriptor) error {
 	ni.locker = nil
 
 	return nil
-}
-
-func (ni *nodeInfo) OwnedBy(nid *nodeDescriptor) bool {
-	ni.lock.RLock()
-	defer ni.lock.RUnlock()
-
-	return ni.locker == nid
-}
-
-func (ni *nodeInfo) EnterKeepAlive() {
-	ni.lock.Lock()
-	defer ni.lock.Unlock()
-
-	ni.keepAlive = true
-}
-func (ni *nodeInfo) ExitKeepAlive() {
-	ni.lock.Lock()
-	defer ni.lock.Unlock()
-
-	ni.keepAlive = false
-	ni.lastPing = time.Now()
 }

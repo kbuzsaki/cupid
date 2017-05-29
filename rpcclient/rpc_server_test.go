@@ -22,7 +22,7 @@ func TestRPC_KeepAlive(t *testing.T) {
 		}
 	}
 
-	s, err := server.New()
+	s, err := server.NewFrontend()
 	ne("Could not instantiate server", err)
 	addr := randaddr()
 
@@ -45,7 +45,7 @@ func TestRPC_OpenGetSet(t *testing.T) {
 		}
 	}
 
-	s, err := server.New()
+	s, err := server.NewFrontend()
 	ne("Could not instantiate server", err)
 	addr := randaddr()
 
@@ -68,7 +68,7 @@ func TestRPC_OpenReadOnly(t *testing.T) {
 		}
 	}
 
-	s, err := server.New()
+	s, err := server.NewFrontend()
 	ne("Could not instantiate server", err)
 	addr := randaddr()
 
@@ -91,7 +91,7 @@ func TestRPC_SetContentGeneration(t *testing.T) {
 		}
 	}
 
-	s, err := server.New()
+	s, err := server.NewFrontend()
 	ne("Could not instantiate server", err)
 	addr := randaddr()
 
@@ -114,7 +114,7 @@ func TestRPC_ConcurrentOpen(t *testing.T) {
 		}
 	}
 
-	s, err := server.New()
+	s, err := server.NewFrontend()
 	ne("Could not instantiate server", err)
 	addr := randaddr()
 
@@ -137,7 +137,7 @@ func TestRPC_TryAcquire(t *testing.T) {
 		}
 	}
 
-	s, err := server.New()
+	s, err := server.NewFrontend()
 	ne("Could not instantiate server", err)
 	addr := randaddr()
 
@@ -160,7 +160,7 @@ func TestRPC_BadRelease(t *testing.T) {
 		}
 	}
 
-	s, err := server.New()
+	s, err := server.NewFrontend()
 	ne("Could not instantiate server", err)
 	addr := randaddr()
 

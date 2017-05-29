@@ -1,21 +1,8 @@
 package server
 
-import (
-	"log"
-	"sync"
-	"time"
-)
-
-const (
-	sessionTimeout = 5 * time.Second
-)
+import "sync"
 
 type descriptorKey uint64
-
-type sessionEvent struct {
-	event   ContentInvalidationPushEvent
-	ackChan chan struct{}
-}
 
 type clientSession struct {
 	key descriptorKey
@@ -24,9 +11,6 @@ type clientSession struct {
 	data      map[descriptorKey]*nodeDescriptor
 	ndsByPath map[string][]descriptorKey
 	nextKey   descriptorKey
-
-	events   chan sessionEvent
-	ackChans []chan struct{}
 }
 
 func newClientSession(key descriptorKey) *clientSession {
@@ -34,32 +18,11 @@ func newClientSession(key descriptorKey) *clientSession {
 		key:       key,
 		data:      make(map[descriptorKey]*nodeDescriptor),
 		ndsByPath: make(map[string][]descriptorKey),
-		events:    make(chan sessionEvent),
 	}
 }
 
 func (cs *clientSession) GetSD() SessionDescriptor {
 	return SessionDescriptor{cs.key}
-}
-
-func (cs *clientSession) InvalidateCache(nd NodeDescriptor, cas NodeContentAndStat) {
-	ackChan := make(chan struct{})
-	se := sessionEvent{
-		event:   ContentInvalidationPushEvent{nd, cas},
-		ackChan: ackChan,
-	}
-
-	// we have sent the event to KeepAlive
-	cs.events <- se
-
-	// now wait for ack or timeout
-	select {
-	case <-time.Tick(sessionTimeout):
-		// TODO: do we have to clean anything up if we time out?
-		log.Println("Timed out for session:", cs.key, nd)
-	case <-ackChan:
-		// success!
-	}
 }
 
 func (cs *clientSession) GetDescriptor(key descriptorKey) *nodeDescriptor {

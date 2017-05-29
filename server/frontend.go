@@ -1,9 +1,28 @@
 package server
 
 import (
+	"errors"
 	"sync"
 	"time"
 )
+
+const (
+	maxKeepAliveDelay = 3 * time.Second
+)
+
+var (
+	ErrInvalidSessionDescriptor = errors.New("Invalid session descriptor")
+	ErrInvalidNodeDescriptor    = errors.New("Invalid node descriptor")
+	ErrReadOnlyNodeDescriptor   = errors.New("Write from read-only node descriptor")
+)
+
+func minTime(keepAliveDelay time.Duration) time.Duration {
+	if keepAliveDelay > maxKeepAliveDelay {
+		return maxKeepAliveDelay
+	}
+
+	return keepAliveDelay
+}
 
 type pendingEvent struct {
 	event Event
@@ -25,7 +44,8 @@ type sessionConn struct {
 
 func NewSessionConn() *sessionConn {
 	return &sessionConn{
-		signaler: NewSignaler(),
+		lastKeepAlive: time.Now(),
+		signaler:      NewSignaler(),
 	}
 }
 

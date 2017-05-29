@@ -6,6 +6,8 @@ import (
 )
 
 func DoServerTest_KeepAlive(t *testing.T, s Server) {
+	t.SkipNow()
+
 	ne := func(m string, e error) {
 		if e != nil {
 			t.Error(m, e)
