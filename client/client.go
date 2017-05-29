@@ -33,6 +33,15 @@ func New(addr string, keepAliveDelay time.Duration) (Client, error) {
 	return newFromServer(s, keepAliveDelay)
 }
 
+func NewRaft(addrs []string, keepAliveDelay time.Duration) (Client, error) {
+	var delegates []server.Server
+	for _, addr := range addrs {
+		delegates = append(delegates, rpcclient.New(addr, keepAliveDelay))
+	}
+	s := &RedirectServer{delegates: delegates, leader: 1, pendingLeader: 1}
+	return newFromServer(s, keepAliveDelay)
+}
+
 func newFromServer(s server.Server, keepAliveDelay time.Duration) (Client, error) {
 	eventsIn := make(chan server.Event)
 	eventsOut := make(chan server.Event)

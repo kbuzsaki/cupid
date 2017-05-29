@@ -6,6 +6,7 @@ import "log"
 type FSM interface {
 	OpenSession() SessionDescriptor
 	GetSession(sd SessionDescriptor) *clientSession
+	GetSessionDescriptors() []SessionDescriptor
 
 	OpenNode(sd SessionDescriptor, path string, readOnly bool) NodeDescriptor
 	GetNodeDescriptor(nd NodeDescriptor) *nodeDescriptor
@@ -38,6 +39,17 @@ func (fsm *fsmImpl) OpenSession() SessionDescriptor {
 
 func (fsm *fsmImpl) GetSession(sd SessionDescriptor) *clientSession {
 	return fsm.sessions.GetSession(sd.Descriptor)
+}
+
+func (fsm *fsmImpl) GetSessionDescriptors() []SessionDescriptor {
+	var sds []SessionDescriptor
+
+	keys := fsm.sessions.GetSessionDescriptors()
+	for _, key := range keys {
+		sds = append(sds, SessionDescriptor{key})
+	}
+
+	return sds
 }
 
 func (fsm *fsmImpl) OpenNode(sd SessionDescriptor, path string, readOnly bool) NodeDescriptor {

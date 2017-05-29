@@ -124,7 +124,11 @@ func (sc *sessionConn) AckEvents() {
 
 // TODO: error handling
 type frontendImpl struct {
-	fsm       FSM
+	fsm FSM
+
+	csLock sync.RWMutex
+	cs     ClusterState
+
 	sessions  AtomicMap
 	lockLocks AtomicStringMap
 }
@@ -135,16 +139,66 @@ func NewFrontend() (Server, error) {
 		return nil, err
 	}
 
-	c := make(chan string)
-	fsm = NewRaftFSM(c, c, fsm)
-	return &frontendImpl{
+	c := make(chan string, 1)
+	c2 := make(chan *string, 1)
+	go func() {
+		for {
+			s := <-c
+			c2 <- &s
+		}
+	}()
+
+	fsm = NewRaftFSM(c, c2, fsm)
+	stateC := make(chan ClusterState, 1)
+	stateC <- ClusterState{true, 0, ""}
+	return NewFrontendWithFSM(fsm, stateC)
+}
+
+func NewFrontendWithFSM(fsm FSM, stateChanges <-chan ClusterState) (Server, error) {
+	fe := &frontendImpl{
 		fsm:       fsm,
 		sessions:  NewAtomicMap(),
 		lockLocks: NewAtomicStringMapWithDefault(func(string) interface{} { return &sync.Mutex{} }),
-	}, nil
+	}
+
+	go func() {
+		for cs := range stateChanges {
+			fe.setClusterState(cs)
+		}
+	}()
+
+	return fe, nil
+}
+
+func (fe *frontendImpl) setClusterState(cs ClusterState) {
+	fe.csLock.Lock()
+	defer fe.csLock.Unlock()
+	wasLeader := fe.cs.IsLeader
+	fe.cs = cs
+
+	if wasLeader && !cs.IsLeader {
+		fe.sessions = NewAtomicMap()
+		fe.lockLocks = NewAtomicStringMapWithDefault(func(string) interface{} { return &sync.Mutex{} })
+	} else if !wasLeader && cs.IsLeader {
+		sds := fe.fsm.GetSessionDescriptors()
+		for _, sd := range sds {
+			fe.sessions.Put(uint64(sd.Descriptor), NewSessionConn())
+		}
+		// TODO: finish propagating events
+	}
+}
+
+func (fe *frontendImpl) getClusterState() ClusterState {
+	fe.csLock.RLock()
+	defer fe.csLock.RUnlock()
+	return fe.cs
 }
 
 func (fe *frontendImpl) KeepAlive(li LeaseInfo, eis []EventInfo, keepAliveDelay time.Duration) ([]Event, error) {
+	if cs := fe.getClusterState(); !cs.IsLeader {
+		return nil, cs.MakeRedirectError()
+	}
+
 	sc := fe.sessions.Get(uint64(li.Session.Descriptor)).(*sessionConn)
 	sc.EnterKeepAlive()
 	defer sc.ExitKeepAlive()
@@ -163,12 +217,20 @@ func (fe *frontendImpl) KeepAlive(li LeaseInfo, eis []EventInfo, keepAliveDelay 
 }
 
 func (fe *frontendImpl) OpenSession() (SessionDescriptor, error) {
+	if cs := fe.getClusterState(); !cs.IsLeader {
+		return SessionDescriptor{}, cs.MakeRedirectError()
+	}
+
 	sd := fe.fsm.OpenSession()
 	fe.sessions.Put(uint64(sd.Descriptor), NewSessionConn())
 	return sd, nil
 }
 
 func (fe *frontendImpl) Open(sd SessionDescriptor, path string, readOnly bool, events EventsConfig) (NodeDescriptor, error) {
+	if cs := fe.getClusterState(); !cs.IsLeader {
+		return NodeDescriptor{}, cs.MakeRedirectError()
+	}
+
 	if session := fe.fsm.GetSession(sd); session == nil {
 		return NodeDescriptor{}, ErrInvalidSessionDescriptor
 	}
@@ -177,6 +239,10 @@ func (fe *frontendImpl) Open(sd SessionDescriptor, path string, readOnly bool, e
 }
 
 func (fe *frontendImpl) Acquire(nd NodeDescriptor) error {
+	if cs := fe.getClusterState(); !cs.IsLeader {
+		return cs.MakeRedirectError()
+	}
+
 	for {
 		locked, err := fe.TryAcquire(nd)
 		if err != nil {
@@ -188,6 +254,10 @@ func (fe *frontendImpl) Acquire(nd NodeDescriptor) error {
 }
 
 func (fe *frontendImpl) TryAcquire(nd NodeDescriptor) (bool, error) {
+	if cs := fe.getClusterState(); !cs.IsLeader {
+		return false, cs.MakeRedirectError()
+	}
+
 	var nid *nodeDescriptor
 	if nid = fe.fsm.GetNodeDescriptor(nd); nid == nil {
 		return false, ErrInvalidNodeDescriptor
@@ -221,6 +291,10 @@ func (fe *frontendImpl) TryAcquire(nd NodeDescriptor) (bool, error) {
 }
 
 func (fe *frontendImpl) Release(nd NodeDescriptor) error {
+	if cs := fe.getClusterState(); !cs.IsLeader {
+		return cs.MakeRedirectError()
+	}
+
 	if node := fe.fsm.GetNodeDescriptor(nd); node == nil {
 		return ErrInvalidNodeDescriptor
 	} else if node.readOnly {
@@ -234,6 +308,10 @@ func (fe *frontendImpl) Release(nd NodeDescriptor) error {
 }
 
 func (fe *frontendImpl) GetContentAndStat(nd NodeDescriptor) (NodeContentAndStat, error) {
+	if cs := fe.getClusterState(); !cs.IsLeader {
+		return NodeContentAndStat{}, cs.MakeRedirectError()
+	}
+
 	if node := fe.fsm.GetNodeDescriptor(nd); node == nil {
 		return NodeContentAndStat{}, ErrInvalidNodeDescriptor
 	}
@@ -242,6 +320,10 @@ func (fe *frontendImpl) GetContentAndStat(nd NodeDescriptor) (NodeContentAndStat
 }
 
 func (fe *frontendImpl) SetContent(nd NodeDescriptor, content string, generation uint64) (bool, error) {
+	if cs := fe.getClusterState(); !cs.IsLeader {
+		return false, cs.MakeRedirectError()
+	}
+
 	if node := fe.fsm.GetNodeDescriptor(nd); node == nil {
 		return false, ErrInvalidNodeDescriptor
 	} else if node.readOnly {

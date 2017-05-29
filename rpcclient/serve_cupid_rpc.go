@@ -27,6 +27,8 @@ func ServeCupidRPC(s server.Server, addr string, ready chan bool) {
 
 	go func() { ready <- true }()
 
+	log.Println("cupid rpc listening on:", addr)
+
 	for {
 		conn, err := listener.Accept()
 		if err != nil {
@@ -34,7 +36,7 @@ func ServeCupidRPC(s server.Server, addr string, ready chan bool) {
 			break
 		}
 
-		log.Println("Accepting new connection from:", conn.RemoteAddr())
+		log.Println("Accepted new connection from:", conn.RemoteAddr())
 
 		go rpcServer.ServeConn(conn)
 	}

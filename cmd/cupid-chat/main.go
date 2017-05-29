@@ -18,20 +18,21 @@ import (
 )
 
 var (
-	addr    = ""
+	addrstr = ""
+	addrs   = []string{}
 	channel = ""
 	nick    = ""
 )
 
 func parseArgs() {
-	flag.StringVar(&addr, "addr", "", "the server address")
+	flag.StringVar(&addrstr, "addrs", "", "the server address")
 	flag.StringVar(&channel, "channel", "", "the channel name to join")
 	flag.StringVar(&nick, "nick", "", "the nickname to use")
 	flag.Parse()
 
 	index := 0
-	if addr == "" {
-		addr = flag.Arg(index)
+	if addrstr == "" {
+		addrstr = flag.Arg(index)
 		index++
 	}
 	if channel == "" {
@@ -42,9 +43,11 @@ func parseArgs() {
 		channel = flag.Arg(index)
 	}
 
-	if addr == "" || channel == "" || nick == "" {
+	if addrstr == "" || channel == "" || nick == "" {
 		log.Fatal("addr, channel, and nick required")
 	}
+
+	addrs = strings.Split(addrstr, ",")
 }
 
 func advertiseNick(chanHandle client.NodeHandle, nick string) ([]string, error) {
@@ -134,7 +137,7 @@ func (c *Channel) registerChatter(chatter string, announce bool) {
 func main() {
 	parseArgs()
 
-	cl, err := client.New(addr, 5*time.Second)
+	cl, err := client.NewRaft(addrs, 5*time.Second)
 	if err != nil {
 		log.Fatal("error opening client:", err)
 	}

@@ -105,7 +105,7 @@ func Decode(s string) interface{} {
 	return p.Get()
 }
 
-func NewRaftFSM(proposeC chan<- string, committedC <-chan string, delegate FSM) FSM {
+func NewRaftFSM(proposeC chan<- string, committedC <-chan *string, delegate FSM) FSM {
 	fsm := &raftFSMImpl{
 		proposeC:        proposeC,
 		committedC:      committedC,
@@ -125,7 +125,7 @@ func NewRaftFSM(proposeC chan<- string, committedC <-chan string, delegate FSM) 
 
 type raftFSMImpl struct {
 	proposeC   chan<- string
-	committedC <-chan string
+	committedC <-chan *string
 	delegate   FSM
 
 	id uint64
@@ -155,6 +155,10 @@ func (fsm *raftFSMImpl) OpenSession() SessionDescriptor {
 
 func (fsm *raftFSMImpl) GetSession(sd SessionDescriptor) *clientSession {
 	return fsm.delegate.GetSession(sd)
+}
+
+func (fsm *raftFSMImpl) GetSessionDescriptors() []SessionDescriptor {
+	return fsm.delegate.GetSessionDescriptors()
 }
 
 func (fsm *raftFSMImpl) OpenNode(sd SessionDescriptor, path string, readOnly bool) NodeDescriptor {
@@ -215,19 +219,38 @@ func (fsm *raftFSMImpl) SetContent(nd NodeDescriptor, cas NodeContentAndStat) bo
 
 func (fsm *raftFSMImpl) readFromLog() {
 	for operation := range fsm.committedC {
-		proposal := Decode(operation)
+		if operation == nil {
+			log.Println("nil operation")
+			continue
+		}
+
+		proposal := Decode(*operation)
 		switch p := proposal.(type) {
 		case OpenSessionProposal:
-			fsm.openSessionAcks.Get(p.ID).(chan SessionDescriptor) <- fsm.delegate.OpenSession()
+			sd := fsm.delegate.OpenSession()
+			if ch := fsm.openSessionAcks.Get(p.ID); ch != nil {
+				ch.(chan SessionDescriptor) <- sd
+			}
 		case OpenNodeProposal:
-			fsm.openNodeAcks.Get(p.ID).(chan NodeDescriptor) <- fsm.delegate.OpenNode(p.SD, p.Path, p.ReadOnly)
+			nd := fsm.delegate.OpenNode(p.SD, p.Path, p.ReadOnly)
+			if ch := fsm.openNodeAcks.Get(p.ID); ch != nil {
+				ch.(chan NodeDescriptor) <- nd
+			}
 		case TryAcquireProposal:
 			fsm.delegate.SetLocked(p.ND)
-			fsm.tryAcquireAcks.Get(p.ID).(chan bool) <- true
+			if ch := fsm.tryAcquireAcks.Get(p.ID); ch != nil {
+				ch.(chan bool) <- true
+			}
 		case ReleaseProposal:
-			fsm.releaseAcks.Get(p.ID).(chan bool) <- fsm.delegate.ReleaseLock(p.ND)
+			succ := fsm.delegate.ReleaseLock(p.ND)
+			if ch := fsm.releaseAcks.Get(p.ID); ch != nil {
+				ch.(chan bool) <- succ
+			}
 		case SetContentProposal:
-			fsm.setContentAcks.Get(p.ID).(chan bool) <- fsm.delegate.SetContent(p.ND, p.CAS)
+			succ := fsm.delegate.SetContent(p.ND, p.CAS)
+			if ch := fsm.setContentAcks.Get(p.ID); ch != nil {
+				ch.(chan bool) <- succ
+			}
 		default:
 			log.Println("unrecognized operation:", proposal)
 		}
