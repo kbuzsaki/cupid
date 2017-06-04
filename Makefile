@@ -1,4 +1,4 @@
-.PHONY: all rall fmt test mocks
+.PHONY: all rall fmt test mocks fresh
 
 all:
 	go install ./... github.com/kbuzsaki/cupid/...
@@ -16,3 +16,6 @@ test:
 mocks:
 	rm -rf mocks
 	cd server && mockery -name=Server && mv mocks ..
+
+fresh:
+	rm -rf raftexample-*
