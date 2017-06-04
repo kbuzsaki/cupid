@@ -2,6 +2,7 @@ package server
 
 import (
 	"errors"
+	"log"
 	"sync"
 	"time"
 )
@@ -150,7 +151,7 @@ func NewFrontend() (Server, error) {
 
 	fsm = NewRaftFSM(c, c2, fsm)
 	stateC := make(chan ClusterState, 1)
-	stateC <- ClusterState{true, 0, ""}
+	stateC <- ClusterState{true, 1, ""}
 	return NewFrontendWithFSM(fsm, stateC)
 }
 
@@ -160,6 +161,9 @@ func NewFrontendWithFSM(fsm FSM, stateChanges <-chan ClusterState) (Server, erro
 		sessions:  NewAtomicMap(),
 		lockLocks: NewAtomicStringMapWithDefault(func(string) interface{} { return &sync.Mutex{} }),
 	}
+
+	cs := <-stateChanges
+	fe.setClusterState(cs)
 
 	go func() {
 		for cs := range stateChanges {
@@ -320,6 +324,11 @@ func (fe *frontendImpl) GetContentAndStat(nd NodeDescriptor) (NodeContentAndStat
 }
 
 func (fe *frontendImpl) SetContent(nd NodeDescriptor, content string, generation uint64) (bool, error) {
+	start := time.Now()
+	defer func() {
+		delta := time.Since(start)
+		log.Println("set content time elapsed:", delta)
+	}()
 	if cs := fe.getClusterState(); !cs.IsLeader {
 		return false, cs.MakeRedirectError()
 	}
@@ -330,11 +339,14 @@ func (fe *frontendImpl) SetContent(nd NodeDescriptor, content string, generation
 		return false, ErrReadOnlyNodeDescriptor
 	}
 
+	scstart := time.Now()
 	ok := fe.fsm.SetContent(nd, NodeContentAndStat{content, NodeStat{generation, time.Now()}})
 	if !ok {
 		return false, nil
 	}
+	log.Println("fsm set time elapsed:", time.Since(scstart))
 
+	invalstart := time.Now()
 	cas := fe.fsm.GetContentAndStat(nd)
 	sds := fe.sessions.Keys()
 	for _, sd := range sds {
@@ -347,6 +359,7 @@ func (fe *frontendImpl) SetContent(nd NodeDescriptor, content string, generation
 			session.SendEvent(event)
 		}
 	}
+	log.Println("invalidate set time elapsed:", time.Since(invalstart))
 
 	return true, nil
 }

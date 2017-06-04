@@ -88,6 +88,7 @@ func (rs *RedirectServer) KeepAlive(li server.LeaseInfo, eis []server.EventInfo,
 		return events, err
 	} else {
 		// it's an error from the rpc library
+		log.Println("KeepAlive error:", err)
 		rs.abortLeader()
 		return rs.KeepAlive(li, eis, keepAliveDelay)
 	}
@@ -106,6 +107,7 @@ func (rs *RedirectServer) OpenSession() (server.SessionDescriptor, error) {
 		log.Println("server error:", se)
 		return sd, err
 	} else {
+		log.Println("OpenSession error:", err)
 		rs.abortLeader()
 		return rs.OpenSession()
 	}
