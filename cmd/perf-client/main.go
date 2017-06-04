@@ -2,7 +2,6 @@ package main
 
 import (
 	"flag"
-	"fmt"
 	"log"
 	"strings"
 	"time"
@@ -55,8 +54,6 @@ func doSubscribe(cl client.Client, topic string) {
 		}
 	})
 
-	fmt.Println("ready")
-
 	wg.Wait()
 	time.Sleep(1 * time.Second)
 }
@@ -69,7 +66,7 @@ func main() {
 	flag.Parse()
 
 	addrs := strings.Split(*addrstrp, ",")
-	fmt.Println("addresses:", addrs)
+	//fmt.Println("addresses:", addrs)
 
 	cl, err := client.NewRaft(addrs, 5*time.Second)
 	if err != nil {

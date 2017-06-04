@@ -8,7 +8,7 @@ import (
 )
 
 const (
-	maxKeepAliveDelay = 3 * time.Second
+	maxKeepAliveDelay = 30 * time.Second
 )
 
 var (
