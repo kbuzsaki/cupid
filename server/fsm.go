@@ -5,10 +5,12 @@ import "log"
 // TODO: does this need a keepalive? where should keepalive information live? maybe just the front end?
 type FSM interface {
 	OpenSession() SessionDescriptor
+	CloseSession(sd SessionDescriptor)
 	GetSession(sd SessionDescriptor) *clientSession
 	GetSessionDescriptors() []SessionDescriptor
 
 	OpenNode(sd SessionDescriptor, path string, readOnly bool, config EventsConfig) NodeDescriptor
+	CloseNode(nd NodeDescriptor)
 	GetNodeDescriptor(nd NodeDescriptor) *nodeDescriptor
 
 	SetLocked(nd NodeDescriptor)
@@ -37,6 +39,10 @@ func (fsm *fsmImpl) OpenSession() SessionDescriptor {
 	return SessionDescriptor{Descriptor: key}
 }
 
+func (fsm *fsmImpl) CloseSession(sd SessionDescriptor) {
+	fsm.sessions.CloseSession(sd)
+}
+
 func (fsm *fsmImpl) GetSession(sd SessionDescriptor) *clientSession {
 	return fsm.sessions.GetSession(sd.Descriptor)
 }
@@ -62,6 +68,16 @@ func (fsm *fsmImpl) OpenNode(sd SessionDescriptor, path string, readOnly bool, c
 		Descriptor: key,
 		Path:       path,
 	}
+}
+
+func (fsm *fsmImpl) CloseNode(nd NodeDescriptor) {
+	session := fsm.sessions.GetSession(nd.Session.Descriptor)
+	if session == nil {
+		log.Println("trying to delete descriptor from null session!")
+		return
+	}
+
+	session.CloseDescriptor(nd.Descriptor)
 }
 
 func (fsm *fsmImpl) GetNodeDescriptor(nd NodeDescriptor) *nodeDescriptor {

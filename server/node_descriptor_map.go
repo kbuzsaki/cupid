@@ -57,9 +57,25 @@ func (cs *clientSession) OpenDescriptor(ni *nodeInfo, readOnly bool, config Even
 	return cs.nextKey
 }
 
+func filterNdsKey(nds []descriptorKey, key descriptorKey) []descriptorKey {
+	var nnds []descriptorKey
+	for _, nd := range nds {
+		if nd != key {
+			nnds = append(nnds, nd)
+		}
+	}
+	return nnds
+}
+
 func (cs *clientSession) CloseDescriptor(key descriptorKey) {
 	cs.lock.Lock()
 	defer cs.lock.Unlock()
+
+	if nid, ok := cs.data[key]; ok {
+		nds := cs.ndsByPath[nid.ni.path]
+		cs.ndsByPath[nid.ni.path] = filterNdsKey(nds, nid.key)
+	}
+
 	delete(cs.data, key)
 }
 
@@ -100,6 +116,12 @@ func (sdm *sessionDescriptorMap) OpenSession() descriptorKey {
 	sdm.nextKey++
 	sdm.data[sdm.nextKey] = newClientSession(sdm.nextKey)
 	return sdm.nextKey
+}
+
+func (sdm *sessionDescriptorMap) CloseSession(sd SessionDescriptor) {
+	sdm.lock.Lock()
+	defer sdm.lock.Unlock()
+	delete(sdm.data, sd.Descriptor)
 }
 
 type nodeDescriptor struct {

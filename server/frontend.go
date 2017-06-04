@@ -230,6 +230,17 @@ func (fe *frontendImpl) OpenSession() (SessionDescriptor, error) {
 	return sd, nil
 }
 
+func (fe *frontendImpl) CloseSession(sd SessionDescriptor) error {
+	if cs := fe.getClusterState(); !cs.IsLeader {
+		return cs.MakeRedirectError()
+	}
+
+	fe.fsm.CloseSession(sd)
+	// TODO: internal cleanup?
+	fe.sessions.Delete(uint64(sd.Descriptor))
+	return nil
+}
+
 func (fe *frontendImpl) Open(sd SessionDescriptor, path string, readOnly bool, config EventsConfig) (NodeDescriptor, error) {
 	if cs := fe.getClusterState(); !cs.IsLeader {
 		return NodeDescriptor{}, cs.MakeRedirectError()
@@ -240,6 +251,16 @@ func (fe *frontendImpl) Open(sd SessionDescriptor, path string, readOnly bool, c
 	}
 
 	return fe.fsm.OpenNode(sd, path, readOnly, config), nil
+}
+
+func (fe *frontendImpl) CloseNode(nd NodeDescriptor) error {
+	if cs := fe.getClusterState(); !cs.IsLeader {
+		return cs.MakeRedirectError()
+	}
+
+	fe.fsm.CloseNode(nd)
+	// TODO: internal cleanup?
+	return nil
 }
 
 func (fe *frontendImpl) Acquire(nd NodeDescriptor) error {

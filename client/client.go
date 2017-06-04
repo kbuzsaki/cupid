@@ -2,6 +2,7 @@ package client
 
 import (
 	"log"
+	"sync"
 	"time"
 
 	"github.com/kbuzsaki/cupid/rpcclient"
@@ -16,6 +17,9 @@ const (
 type clientImpl struct {
 	s  server.Server
 	sd server.SessionDescriptor
+
+	closingLock sync.Mutex
+	closing     bool
 
 	eventsIn  chan<- server.Event
 	eventsOut <-chan server.Event
@@ -100,9 +104,21 @@ func (cl *clientImpl) handleEvents(events []server.Event) {
 	}
 }
 
+func (cl *clientImpl) isClosing() bool {
+	cl.closingLock.Lock()
+	defer cl.closingLock.Unlock()
+	return cl.closing
+}
+
+func (cl *clientImpl) setClosing() {
+	cl.closingLock.Lock()
+	defer cl.closingLock.Unlock()
+	cl.closing = true
+}
+
 // background does background KeepAlive processing in a goroutine
 func (cl *clientImpl) keepAlive() {
-	for {
+	for !cl.isClosing() {
 		li := cl.locks.GetLeaseInfo()
 		li.Session = cl.sd
 		//start := time.Now()
@@ -128,13 +144,30 @@ func (cl *clientImpl) Open(path string, readOnly bool, config server.EventsConfi
 	return &nodeHandleImpl{cl, nd}, nil
 }
 
+func (cl *clientImpl) Close() error {
+	err := cl.s.CloseSession(cl.sd)
+	if err != nil {
+		return err
+	}
+
+	cl.setClosing()
+	return nil
+}
+
 type nodeHandleImpl struct {
 	cl *clientImpl
 	nd server.NodeDescriptor
 }
 
 func (nh *nodeHandleImpl) Close() error {
-	panic("implement me")
+	err := nh.cl.s.CloseNode(nh.nd)
+	if err != nil {
+		return err
+	}
+
+	nh.cl.nodeCache.Delete(nh.nd)
+	nh.cl.nodeCache.Delete(nh.nd)
+	return nil
 }
 
 func (nh *nodeHandleImpl) Acquire() error {

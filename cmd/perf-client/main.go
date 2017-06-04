@@ -3,12 +3,10 @@ package main
 import (
 	"flag"
 	"log"
-	"strings"
-	"time"
-
 	"math"
-
+	"strings"
 	"sync"
+	"time"
 
 	"fmt"
 
@@ -21,6 +19,9 @@ func doPublish(cl client.Client, topic string, count int) {
 	if err != nil {
 		log.Fatal("unable to open node handle")
 	}
+	defer nh.Close()
+
+	start := time.Now()
 
 	for i := 0; i < count; i++ {
 		ok, err := nh.SetContent("foo", math.MaxUint64)
@@ -28,6 +29,9 @@ func doPublish(cl client.Client, topic string, count int) {
 			log.Fatal("unable to set content")
 		}
 	}
+
+	delta := time.Since(start)
+	fmt.Println(delta)
 
 	ok, err := nh.SetContent("shutdown", math.MaxUint64)
 	if err != nil || !ok {
@@ -40,6 +44,7 @@ func doSubscribe(cl client.Client, topic string) {
 	if err != nil {
 		log.Fatal("unable to open node handle")
 	}
+	defer nh.Close()
 
 	_, err = nh.GetContentAndStat()
 	if err != nil {
@@ -108,6 +113,7 @@ func main() {
 	if err != nil {
 		log.Fatal("error opening client:", err)
 	}
+	defer cl.Close()
 
 	if *publisherp {
 		doPublish(cl, *topicp, *countp)

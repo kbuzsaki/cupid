@@ -75,6 +75,16 @@ func (cl *client) OpenSession(_ int, sd *server.SessionDescriptor) error {
 	return conn.Call("Cupid.OpenSession", 0, sd)
 }
 
+func (cl *client) CloseSession(sd *server.SessionDescriptor, _ *int) error {
+	conn, err := cl.getConn()
+	if err != nil {
+		return err
+	}
+
+	i := 0
+	return conn.Call("Cupid.CloseSession", sd, &i)
+}
+
 func (cl *client) Open(args *OpenArgs, nd *server.NodeDescriptor) error {
 	conn, err := cl.getConn()
 	if err != nil {
@@ -82,6 +92,16 @@ func (cl *client) Open(args *OpenArgs, nd *server.NodeDescriptor) error {
 	}
 
 	return conn.Call("Cupid.Open", args, nd)
+}
+
+func (cl *client) CloseNode(nd *server.NodeDescriptor, _ *int) error {
+	conn, err := cl.getConn()
+	if err != nil {
+		return err
+	}
+
+	i := 0
+	return conn.Call("Cupid.CloseNode", nd, &i)
 }
 
 func (cl *client) Acquire(node server.NodeDescriptor, _ *int) error {

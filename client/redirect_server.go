@@ -117,6 +117,24 @@ func (rs *RedirectServer) OpenSession() (server.SessionDescriptor, error) {
 	}
 }
 
+func (rs *RedirectServer) CloseSession(sd server.SessionDescriptor) error {
+	err := rs.getLeader().CloseSession(sd)
+	if err == nil {
+		rs.stabilizeLeader()
+		return nil
+	} else if se, ok := err.(rpc.ServerError); ok {
+		if lre, err := unmarshalRedirectError(se.Error()); err == nil {
+			rs.setLeader(lre.LeaderID)
+			return rs.CloseSession(sd)
+		}
+		log.Println("server error:", se)
+		return err
+	} else {
+		rs.abortLeader()
+		return rs.CloseSession(sd)
+	}
+}
+
 func (rs *RedirectServer) Open(sd server.SessionDescriptor, path string, readOnly bool, config server.EventsConfig) (server.NodeDescriptor, error) {
 	nd, err := rs.getLeader().Open(sd, path, readOnly, config)
 	if err == nil {
@@ -132,6 +150,24 @@ func (rs *RedirectServer) Open(sd server.SessionDescriptor, path string, readOnl
 	} else {
 		rs.abortLeader()
 		return rs.Open(sd, path, readOnly, config)
+	}
+}
+
+func (rs *RedirectServer) CloseNode(nd server.NodeDescriptor) error {
+	err := rs.getLeader().CloseNode(nd)
+	if err == nil {
+		rs.stabilizeLeader()
+		return nil
+	} else if se, ok := err.(rpc.ServerError); ok {
+		if lre, err := unmarshalRedirectError(se.Error()); err == nil {
+			rs.setLeader(lre.LeaderID)
+			return rs.CloseNode(nd)
+		}
+		log.Println("server error:", se)
+		return err
+	} else {
+		rs.abortLeader()
+		return rs.CloseNode(nd)
 	}
 }
 

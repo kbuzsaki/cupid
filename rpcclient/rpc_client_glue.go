@@ -37,6 +37,10 @@ func (cg *clientGlue) OpenSession() (server.SessionDescriptor, error) {
 	return sd, nil
 }
 
+func (cg *clientGlue) CloseSession(sd server.SessionDescriptor) error {
+	return cg.delegate.CloseSession(&sd, nil)
+}
+
 func (cg *clientGlue) Open(sd server.SessionDescriptor, path string, readOnly bool, config server.EventsConfig) (server.NodeDescriptor, error) {
 	args := OpenArgs{sd, path, readOnly, config}
 	nd := server.NodeDescriptor{}
@@ -46,6 +50,10 @@ func (cg *clientGlue) Open(sd server.SessionDescriptor, path string, readOnly bo
 	}
 
 	return nd, nil
+}
+
+func (cg *clientGlue) CloseNode(nd server.NodeDescriptor) error {
+	return cg.delegate.CloseNode(&nd, nil)
 }
 
 func (cg *clientGlue) Acquire(node server.NodeDescriptor) error {

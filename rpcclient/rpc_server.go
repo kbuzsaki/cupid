@@ -12,7 +12,9 @@ type RPCServer interface {
 	KeepAlive(args *KeepAliveArgs, events *[]server.Event) error
 
 	OpenSession(_ int, sd *server.SessionDescriptor) error
+	CloseSession(sd *server.SessionDescriptor, _ *int) error
 	Open(args *OpenArgs, nd *server.NodeDescriptor) error
+	CloseNode(nd *server.NodeDescriptor, _ *int) error
 
 	Acquire(node server.NodeDescriptor, _ *int) error
 	TryAcquire(node server.NodeDescriptor, success *bool) error
@@ -73,6 +75,10 @@ func (rs *rpcServer) OpenSession(_ int, sd *server.SessionDescriptor) error {
 	return nil
 }
 
+func (rs *rpcServer) CloseSession(sd *server.SessionDescriptor, _ *int) error {
+	return rs.delegate.CloseSession(*sd)
+}
+
 func (rs *rpcServer) Open(args *OpenArgs, nd *server.NodeDescriptor) error {
 	descriptor, err := rs.delegate.Open(args.SD, args.Path, args.ReadOnly, args.EventsConfig)
 	if err != nil {
@@ -81,6 +87,10 @@ func (rs *rpcServer) Open(args *OpenArgs, nd *server.NodeDescriptor) error {
 
 	*nd = descriptor
 	return nil
+}
+
+func (rs *rpcServer) CloseNode(nd *server.NodeDescriptor, _ *int) error {
+	return rs.delegate.CloseNode(*nd)
 }
 
 func (rs *rpcServer) Acquire(snd server.NodeDescriptor, _ *int) error {
