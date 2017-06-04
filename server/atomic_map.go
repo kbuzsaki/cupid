@@ -5,6 +5,7 @@ import "sync"
 type AtomicMap interface {
 	Get(k uint64) interface{}
 	Put(k uint64, v interface{})
+	Delete(k uint64)
 	Keys() []uint64
 }
 
@@ -42,6 +43,13 @@ func (am *atomicMapImpl) Put(k uint64, v interface{}) {
 	am.data[k] = v
 }
 
+func (am *atomicMapImpl) Delete(k uint64) {
+	am.lock.Lock()
+	defer am.lock.Unlock()
+
+	delete(am.data, k)
+}
+
 func (am *atomicMapImpl) Keys() []uint64 {
 	am.lock.RLock()
 	defer am.lock.RUnlock()
@@ -56,6 +64,7 @@ func (am *atomicMapImpl) Keys() []uint64 {
 type AtomicStringMap interface {
 	Get(k string) interface{}
 	Put(k string, v interface{})
+	Delete(k string)
 	Keys() []string
 }
 
@@ -91,6 +100,13 @@ func (am *atomicStringMapImpl) Put(k string, v interface{}) {
 	defer am.lock.Unlock()
 
 	am.data[k] = v
+}
+
+func (am *atomicStringMapImpl) Delete(k string) {
+	am.lock.Lock()
+	defer am.lock.Unlock()
+
+	delete(am.data, k)
 }
 
 func (am *atomicStringMapImpl) Keys() []string {
