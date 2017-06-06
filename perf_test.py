@@ -62,6 +62,34 @@ def do_keep_alive_perf_test(subscribers, topic):
 
     print_stats(all_measurements)
 
+def launch_locker(count, addresses, topic, stdout=DEVNULL):
+    addrstr = ",".join(addresses)
+    args = [CLIENT, "-locker", "-addrs", addrstr, "-topic", topic, "-count", str(count)]
+    daemon = Popen(args, stdout=stdout, stderr=DEVNULL)
+    if daemon.poll():
+        raise Exception("failed to init locker")
+    return daemon
+
+#takes in a time and strips the suffix and converts to ms if in s
+def removeSuffix(duration):
+    if "ms" in duration: 
+        return float(duration[:-2])
+
+    #suffix is 's'
+    duration = duration[:-1]
+    duration = float(duration)
+    duration *= 1000
+    return duration
+
+def do_lock_perf_test(count, topic):
+    locker_daemons = launch_daemons(launch_locker, 1, count, ADDRESSES, topic, stdout=PIPE)
+    ld = locker_daemons[0]
+    measurements = []
+    stdout, stderr = ld.communicate()
+    measurements = stdout.decode("utf8").split("\n")[:-1]
+    measurements = [removeSuffix(x) for x in measurements]
+    print_stats(measurements)
+
 def print_stats(measurements):
     print("mean:", statistics.mean(measurements))
     print("stdev:", statistics.stdev(measurements))
@@ -70,7 +98,12 @@ def print_stats(measurements):
     print("min:", min(measurements))
 
 if __name__ == "__main__":
-    topic = sys.argv[1]
-    count = int(sys.argv[2])
-    # do_simple_perf_test(1, 200, topic, count)
-    do_keep_alive_perf_test(count, topic)
+    if sys.argv[1] == "-locker":
+        topic = sys.argv[2]
+        count = int(sys.argv[3])
+        do_lock_perf_test(count, topic)
+    else:
+        topic = sys.argv[1]
+        count = int(sys.argv[2])
+        do_simple_perf_test(1, 200, topic, count)
+        do_keep_alive_perf_test(count, topic)

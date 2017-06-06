@@ -10,6 +10,8 @@ import (
 
 	"sync"
 
+	"fmt"
+
 	"github.com/kbuzsaki/cupid/client"
 	"github.com/kbuzsaki/cupid/server"
 )
@@ -58,15 +60,49 @@ func doSubscribe(cl client.Client, topic string) {
 	time.Sleep(1 * time.Second)
 }
 
+func doLocker(nh client.NodeHandle, created *sync.WaitGroup, finished *sync.WaitGroup) {
+	created.Done()
+	created.Wait()
+
+	start := time.Now()
+	err := nh.Acquire()
+	if err != nil {
+		log.Fatal("unable to acquire lock")
+	}
+
+	fmt.Println(time.Since(start))
+	err = nh.Release()
+	if err != nil {
+		log.Fatal("unable to release lock")
+	}
+	finished.Done()
+}
+
+func launchLockers(cl client.Client, topic string, count int) {
+	created := sync.WaitGroup{}
+	finished := sync.WaitGroup{}
+	created.Add(count)
+	finished.Add(count)
+
+	for i := 0; i < count; i++ {
+		nh, err := cl.Open(topic, false, server.EventsConfig{})
+		if err != nil {
+			log.Fatal("Unable to open file")
+		}
+		go doLocker(nh, &created, &finished)
+	}
+	finished.Wait()
+}
+
 func main() {
 	addrstrp := flag.String("addrs", "", "the server address")
-	publisherp := flag.Bool("publish", false, "whether the client will publish or subscribe")
+	publisherp := flag.Bool("publish", false, "whether the client will publish")
+	lockp := flag.Bool("locker", false, "whether the client will run locker benchmark")
 	topicp := flag.String("topic", "", "the topic to publish or subscribe to")
 	countp := flag.Int("count", 100, "the number of messages to publish")
 	flag.Parse()
 
 	addrs := strings.Split(*addrstrp, ",")
-	//fmt.Println("addresses:", addrs)
 
 	cl, err := client.NewRaft(addrs, 5*time.Second)
 	if err != nil {
@@ -75,6 +111,8 @@ func main() {
 
 	if *publisherp {
 		doPublish(cl, *topicp, *countp)
+	} else if *lockp {
+		launchLockers(cl, *topicp, *countp)
 	} else {
 		doSubscribe(cl, *topicp)
 	}
