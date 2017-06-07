@@ -371,6 +371,9 @@ func (fe *frontendImpl) SetContent(nd NodeDescriptor, content string, generation
 	cas := fe.fsm.GetContentAndStat(nd)
 	sds := fe.sessions.Keys()
 	for _, sd := range sds {
+		if sd == uint64(nd.Session.Descriptor) {
+			continue
+		}
 		// if the session has been closed since, just ignore it
 		session, ok := fe.sessions.Get(sd).(*sessionConn)
 		if !ok {
