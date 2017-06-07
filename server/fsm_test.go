@@ -12,7 +12,7 @@ func BenchmarkFsmImpl_SetContent(b *testing.B) {
 	}
 
 	sd := fsm.OpenSession()
-	nd := fsm.OpenNode(sd, "/foo/bar", false)
+	nd := fsm.OpenNode(sd, "/foo/bar", false, EventsConfig{})
 
 	cas := NodeContentAndStat{
 		Content: "some content",
@@ -47,7 +47,7 @@ func BenchmarkFsmImpl_SetContentNoOp(b *testing.B) {
 	}
 
 	sd := fsm.OpenSession()
-	nd := fsm.OpenNode(sd, "/foo/bar", false)
+	nd := fsm.OpenNode(sd, "/foo/bar", false, EventsConfig{})
 
 	cas := NodeContentAndStat{
 		Content: "some content",

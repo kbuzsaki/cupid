@@ -17,7 +17,7 @@ import (
 )
 
 var (
-	addr       = ""
+	addrs      []string
 	debug      = false
 	command    = ""
 	path       = ""
@@ -47,7 +47,9 @@ func parseArgs() []string {
 		log.Fatal("Address is required")
 	}
 
-	addr = *addrp
+	temp_addr := *addrp
+	addrs = strings.Split(temp_addr, ",")
+
 	debug = *debugp
 
 	args := flag.Args()
@@ -71,7 +73,8 @@ func maybePrintHelp(ok bool) bool {
 
 func mustGetNodeHandle(path string) client.NodeHandle {
 	if _, ok := handles[path]; !ok {
-		nh, err := cl.Open(path, false, server.EventsConfig{})
+		nh, err := cl.Open(path, false, server.EventsConfig{false, false, false})
+		nh.Register(printEvents)
 		if err != nil {
 			log.Fatalf("open error:", err)
 		}
@@ -277,35 +280,55 @@ func runPrompt() {
 
 }
 
-func printEvents(in <-chan server.Event) {
-	for rawEvent := range in {
-		switch event := rawEvent.(type) {
-		case server.LockInvalidationEvent:
-			fmt.Println("\nLock Invalidation Event:", event)
-		case server.ContentInvalidationEvent:
-			fmt.Println("\nContent Invalidation Event:", event)
-		case server.ContentInvalidationPushEvent:
-			fmt.Println("\nContent Invalidation Push Event:", event)
-		default:
-			fmt.Println("\nUnrecognized event:", rawEvent)
-		}
-		fmt.Print(prompt)
-	}
+func printEvents(path string, cas server.NodeContentAndStat) {
+	fmt.Println()
+	fmt.Print(prompt)
+	//fmt.Println()
+	//fmt.Println("Invalidation Event:")
+	//fmt.Println("\t" + path)
+	//fmt.Println(cas.Stat.Generation)
+	//fmt.Println(cas.Content)
+	//fmt.Println()
+	//fmt.Print(prompt)
 }
+
+//func printEvents(in <-chan server.Event) {
+//	for rawEvent := range in {
+//		switch event := rawEvent.(type) {
+//		case server.LockInvalidationEvent:
+//			fmt.Println("\nLock Invalidation Event:", event)
+//		case server.ContentInvalidationEvent:
+//			fmt.Println("\nContent Invalidation Event:", event)
+//		case server.ContentInvalidationPushEvent:
+//			fmt.Println("\nContent Invalidation Push Event:", event)
+//		default:
+//			fmt.Println("\nUnrecognized event:", rawEvent)
+//		}
+//		fmt.Print(prompt)
+//	}
+//}
 
 func main() {
 	args := parseArgs()
+	fmt.Println(addrs)
+	tmp_cl, err := client.NewRaft(addrs, 5)
 
-	tmp_cl, err := client.New(addr, 5)
 	if err != nil {
-		log.Fatalf("error initializing client: %v\n", err)
+		log.Fatalf("error initialiing client %v\n", err)
 	}
 	cl = tmp_cl
 
-	subscriber, err = client.NewSubscriber(cl)
-	if err != nil {
-		log.Fatal("failed to open subscriber")
-	}
+	//tmp_cl, err := client.New(addr, 5)
+	//fmt.Println("made new client")
+	//if err != nil {
+	//	log.Fatalf("error initializing client: %v\n", err)
+	//}
+	//cl = tmp_cl
+
+	//subscriber, err = client.NewSubscriber(cl)
+	//if err != nil {
+	//	log.Fatal("failed to open subscriber")
+	//}
 
 	if command == "" {
 		runPrompt()

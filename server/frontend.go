@@ -8,7 +8,7 @@ import (
 )
 
 const (
-	maxKeepAliveDelay = 30 * time.Second
+	maxKeepAliveDelay = 3 * time.Second
 )
 
 var (
@@ -230,7 +230,7 @@ func (fe *frontendImpl) OpenSession() (SessionDescriptor, error) {
 	return sd, nil
 }
 
-func (fe *frontendImpl) Open(sd SessionDescriptor, path string, readOnly bool, events EventsConfig) (NodeDescriptor, error) {
+func (fe *frontendImpl) Open(sd SessionDescriptor, path string, readOnly bool, config EventsConfig) (NodeDescriptor, error) {
 	if cs := fe.getClusterState(); !cs.IsLeader {
 		return NodeDescriptor{}, cs.MakeRedirectError()
 	}
@@ -239,7 +239,7 @@ func (fe *frontendImpl) Open(sd SessionDescriptor, path string, readOnly bool, e
 		return NodeDescriptor{}, ErrInvalidSessionDescriptor
 	}
 
-	return fe.fsm.OpenNode(sd, path, readOnly), nil
+	return fe.fsm.OpenNode(sd, path, readOnly, config), nil
 }
 
 func (fe *frontendImpl) Acquire(nd NodeDescriptor) error {
@@ -323,6 +323,13 @@ func (fe *frontendImpl) GetContentAndStat(nd NodeDescriptor) (NodeContentAndStat
 	return fe.fsm.GetContentAndStat(nd), nil
 }
 
+func createInvalidationEvent(nd NodeDescriptor, cas NodeContentAndStat, config EventsConfig) Event {
+	if config.ContentModified {
+		return ContentInvalidationPushEvent{nd, cas}
+	}
+	return ContentInvalidationEvent{nd}
+}
+
 func (fe *frontendImpl) SetContent(nd NodeDescriptor, content string, generation uint64) (bool, error) {
 	start := time.Now()
 	defer func() {
@@ -355,7 +362,7 @@ func (fe *frontendImpl) SetContent(nd NodeDescriptor, content string, generation
 		keys := cs.GetDescriptorKeys(nd.Path)
 		for _, key := range keys {
 			snd := NodeDescriptor{SessionDescriptor{cs.key}, key, nd.Path}
-			event := ContentInvalidationPushEvent{snd, cas}
+			event := createInvalidationEvent(snd, cas, fe.fsm.GetNodeDescriptor(nd).config)
 			session.SendEvent(event)
 		}
 	}

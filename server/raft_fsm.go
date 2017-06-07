@@ -55,6 +55,7 @@ type OpenNodeProposal struct {
 	SD       SessionDescriptor
 	Path     string
 	ReadOnly bool
+	Config   EventsConfig
 }
 
 func (onp *OpenNodeProposal) Wrap() Proposal {
@@ -161,13 +162,13 @@ func (fsm *raftFSMImpl) GetSessionDescriptors() []SessionDescriptor {
 	return fsm.delegate.GetSessionDescriptors()
 }
 
-func (fsm *raftFSMImpl) OpenNode(sd SessionDescriptor, path string, readOnly bool) NodeDescriptor {
+func (fsm *raftFSMImpl) OpenNode(sd SessionDescriptor, path string, readOnly bool, config EventsConfig) NodeDescriptor {
 	id := fsm.nextId()
 
 	ac := make(chan NodeDescriptor)
 	fsm.openNodeAcks.Put(id, ac)
 
-	proposal := OpenNodeProposal{ID: id, SD: sd, Path: path, ReadOnly: readOnly}
+	proposal := OpenNodeProposal{ID: id, SD: sd, Path: path, ReadOnly: readOnly, Config: config}
 	fsm.proposeC <- Encode(proposal.Wrap())
 
 	return <-ac
@@ -232,7 +233,7 @@ func (fsm *raftFSMImpl) readFromLog() {
 				ch.(chan SessionDescriptor) <- sd
 			}
 		case OpenNodeProposal:
-			nd := fsm.delegate.OpenNode(p.SD, p.Path, p.ReadOnly)
+			nd := fsm.delegate.OpenNode(p.SD, p.Path, p.ReadOnly, p.Config)
 			if ch := fsm.openNodeAcks.Get(p.ID); ch != nil {
 				ch.(chan NodeDescriptor) <- nd
 			}

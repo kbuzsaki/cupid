@@ -47,11 +47,11 @@ func (cs *clientSession) GetDescriptorKeys(path string) []descriptorKey {
 	return cs.ndsByPath[path]
 }
 
-func (cs *clientSession) OpenDescriptor(ni *nodeInfo, readOnly bool) descriptorKey {
+func (cs *clientSession) OpenDescriptor(ni *nodeInfo, readOnly bool, config EventsConfig) descriptorKey {
 	cs.lock.Lock()
 	defer cs.lock.Unlock()
 	cs.nextKey++
-	nd := &nodeDescriptor{cs, cs.nextKey, ni, readOnly}
+	nd := &nodeDescriptor{cs, cs.nextKey, ni, readOnly, config}
 	cs.data[cs.nextKey] = nd
 	cs.ndsByPath[ni.path] = append(cs.ndsByPath[ni.path], cs.nextKey)
 	return cs.nextKey
@@ -107,6 +107,7 @@ type nodeDescriptor struct {
 	key      descriptorKey
 	ni       *nodeInfo
 	readOnly bool
+	config   EventsConfig
 }
 
 func (nd *nodeDescriptor) GetND() NodeDescriptor {

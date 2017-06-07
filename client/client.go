@@ -119,8 +119,8 @@ func (cl *clientImpl) keepAlive() {
 	}
 }
 
-func (cl *clientImpl) Open(path string, readOnly bool, events server.EventsConfig) (NodeHandle, error) {
-	nd, err := cl.s.Open(cl.sd, path, readOnly, events)
+func (cl *clientImpl) Open(path string, readOnly bool, config server.EventsConfig) (NodeHandle, error) {
+	nd, err := cl.s.Open(cl.sd, path, readOnly, config)
 	if err != nil {
 		return nil, err
 	}

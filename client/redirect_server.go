@@ -22,6 +22,11 @@ type RedirectServer struct {
 func unmarshalRedirectError(se string) (server.LeaderRedirectError, error) {
 	var lre server.LeaderRedirectError
 	err := json.Unmarshal([]byte(se), &lre)
+	if err == nil {
+		log.Println(lre.LeaderID)
+	} else {
+		log.Println("Error unmarshalling redirect error")
+	}
 	return lre, err
 }
 
@@ -42,8 +47,11 @@ func (rs *RedirectServer) stabilizeLeader() {
 	rs.lock.Lock()
 	defer rs.lock.Unlock()
 
-	rs.leader = rs.pendingLeader
-	//log.Println("stabilize leader:", rs.leader)
+	// only stabilize if we're currently aborting
+	if rs.leader == 0 {
+		rs.leader = rs.pendingLeader
+		//log.Println("stabilize leader:", rs.leader)
+	}
 }
 
 func (rs *RedirectServer) abortLeader() {
@@ -84,11 +92,9 @@ func (rs *RedirectServer) KeepAlive(li server.LeaseInfo, eis []server.EventInfo,
 			rs.setLeader(lre.LeaderID)
 			return rs.KeepAlive(li, eis, keepAliveDelay)
 		}
-		log.Println("server error:", se)
 		return events, err
 	} else {
 		// it's an error from the rpc library
-		log.Println("KeepAlive error:", err)
 		rs.abortLeader()
 		return rs.KeepAlive(li, eis, keepAliveDelay)
 	}
@@ -104,30 +110,28 @@ func (rs *RedirectServer) OpenSession() (server.SessionDescriptor, error) {
 			rs.setLeader(lre.LeaderID)
 			return rs.OpenSession()
 		}
-		log.Println("server error:", se)
 		return sd, err
 	} else {
-		log.Println("OpenSession error:", err)
 		rs.abortLeader()
 		return rs.OpenSession()
 	}
 }
 
-func (rs *RedirectServer) Open(sd server.SessionDescriptor, path string, readOnly bool, events server.EventsConfig) (server.NodeDescriptor, error) {
-	nd, err := rs.getLeader().Open(sd, path, readOnly, events)
+func (rs *RedirectServer) Open(sd server.SessionDescriptor, path string, readOnly bool, config server.EventsConfig) (server.NodeDescriptor, error) {
+	nd, err := rs.getLeader().Open(sd, path, readOnly, config)
 	if err == nil {
 		rs.stabilizeLeader()
 		return nd, nil
 	} else if se, ok := err.(rpc.ServerError); ok {
 		if lre, err := unmarshalRedirectError(se.Error()); err == nil {
 			rs.setLeader(lre.LeaderID)
-			return rs.Open(sd, path, readOnly, events)
+			return rs.Open(sd, path, readOnly, config)
 		}
 		log.Println("server error:", se)
 		return nd, err
 	} else {
 		rs.abortLeader()
-		return rs.Open(sd, path, readOnly, events)
+		return rs.Open(sd, path, readOnly, config)
 	}
 }
 

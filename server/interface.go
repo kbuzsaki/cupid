@@ -6,7 +6,7 @@ type Server interface {
 	KeepAlive(li LeaseInfo, eis []EventInfo, keepAliveDelay time.Duration) ([]Event, error)
 
 	OpenSession() (SessionDescriptor, error)
-	Open(sd SessionDescriptor, path string, readOnly bool, events EventsConfig) (NodeDescriptor, error)
+	Open(sd SessionDescriptor, path string, readOnly bool, config EventsConfig) (NodeDescriptor, error)
 
 	Acquire(node NodeDescriptor) error
 	TryAcquire(node NodeDescriptor) (bool, error)

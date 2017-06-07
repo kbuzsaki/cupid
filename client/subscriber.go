@@ -4,6 +4,8 @@ import (
 	"errors"
 	"log"
 
+	"fmt"
+
 	"github.com/kbuzsaki/cupid/server"
 )
 
@@ -54,6 +56,7 @@ func (s *subscriber) handleEvent(rawEvent server.Event) {
 
 	switch event := rawEvent.(type) {
 	case server.ContentInvalidationEvent:
+		fmt.Println("Got Content Invalidation Event")
 		nh := &nodeHandleImpl{s.cl.(*clientImpl), event.Descriptor}
 		cas, err := nh.GetContentAndStat()
 		if err != nil {
@@ -66,6 +69,7 @@ func (s *subscriber) handleEvent(rawEvent server.Event) {
 			cb(event.Descriptor.Path, cas)
 		}
 	case server.ContentInvalidationPushEvent:
+		fmt.Println("Got Content Invaldition Push Event")
 		cb := s.callbacks[event.Descriptor.Path]
 		//log.Println("got push event for nd:", event.Descriptor)
 		if cb != nil {

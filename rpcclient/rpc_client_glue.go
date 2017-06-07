@@ -37,8 +37,8 @@ func (cg *clientGlue) OpenSession() (server.SessionDescriptor, error) {
 	return sd, nil
 }
 
-func (cg *clientGlue) Open(sd server.SessionDescriptor, path string, readOnly bool, events server.EventsConfig) (server.NodeDescriptor, error) {
-	args := OpenArgs{sd, path, readOnly, events}
+func (cg *clientGlue) Open(sd server.SessionDescriptor, path string, readOnly bool, config server.EventsConfig) (server.NodeDescriptor, error) {
+	args := OpenArgs{sd, path, readOnly, config}
 	nd := server.NodeDescriptor{}
 	err := cg.delegate.Open(&args, &nd)
 	if err != nil {

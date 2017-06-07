@@ -8,7 +8,7 @@ type FSM interface {
 	GetSession(sd SessionDescriptor) *clientSession
 	GetSessionDescriptors() []SessionDescriptor
 
-	OpenNode(sd SessionDescriptor, path string, readOnly bool) NodeDescriptor
+	OpenNode(sd SessionDescriptor, path string, readOnly bool, config EventsConfig) NodeDescriptor
 	GetNodeDescriptor(nd NodeDescriptor) *nodeDescriptor
 
 	SetLocked(nd NodeDescriptor)
@@ -52,11 +52,11 @@ func (fsm *fsmImpl) GetSessionDescriptors() []SessionDescriptor {
 	return sds
 }
 
-func (fsm *fsmImpl) OpenNode(sd SessionDescriptor, path string, readOnly bool) NodeDescriptor {
+func (fsm *fsmImpl) OpenNode(sd SessionDescriptor, path string, readOnly bool, config EventsConfig) NodeDescriptor {
 	session := fsm.sessions.GetSession(sd.Descriptor)
 
 	ni := fsm.nodes.GetOrCreateNode(path)
-	key := session.OpenDescriptor(ni, readOnly)
+	key := session.OpenDescriptor(ni, readOnly, config)
 	return NodeDescriptor{
 		Session:    sd,
 		Descriptor: key,
