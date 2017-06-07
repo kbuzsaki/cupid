@@ -2,7 +2,6 @@ package server
 
 import (
 	"errors"
-	"log"
 	"sync"
 	"time"
 )
@@ -352,11 +351,6 @@ func createInvalidationEvent(nd NodeDescriptor, cas NodeContentAndStat, config E
 }
 
 func (fe *frontendImpl) SetContent(nd NodeDescriptor, content string, generation uint64) (bool, error) {
-	start := time.Now()
-	defer func() {
-		delta := time.Since(start)
-		log.Println("set content time elapsed:", delta)
-	}()
 	if cs := fe.getClusterState(); !cs.IsLeader {
 		return false, cs.MakeRedirectError()
 	}
@@ -367,27 +361,37 @@ func (fe *frontendImpl) SetContent(nd NodeDescriptor, content string, generation
 		return false, ErrReadOnlyNodeDescriptor
 	}
 
-	scstart := time.Now()
 	ok := fe.fsm.SetContent(nd, NodeContentAndStat{content, NodeStat{generation, time.Now()}})
 	if !ok {
 		return false, nil
 	}
-	log.Println("fsm set time elapsed:", time.Since(scstart))
 
-	invalstart := time.Now()
+	wg := sync.WaitGroup{}
+
 	cas := fe.fsm.GetContentAndStat(nd)
 	sds := fe.sessions.Keys()
 	for _, sd := range sds {
-		session := fe.sessions.Get(sd).(*sessionConn)
+		// if the session has been closed since, just ignore it
+		session, ok := fe.sessions.Get(sd).(*sessionConn)
+		if !ok {
+			continue
+		}
+
 		cs := fe.fsm.GetSession(SessionDescriptor{descriptorKey(sd)})
 		keys := cs.GetDescriptorKeys(nd.Path)
+		wg.Add(len(keys))
 		for _, key := range keys {
-			snd := NodeDescriptor{SessionDescriptor{cs.key}, key, nd.Path}
-			event := createInvalidationEvent(snd, cas, fe.fsm.GetNodeDescriptor(nd).config)
-			session.SendEvent(event)
+			go func(key descriptorKey) {
+				snd := NodeDescriptor{SessionDescriptor{cs.key}, key, nd.Path}
+				event := createInvalidationEvent(snd, cas, fe.fsm.GetNodeDescriptor(nd).config)
+
+				session.SendEvent(event)
+				wg.Done()
+			}(key)
 		}
 	}
-	log.Println("invalidate set time elapsed:", time.Since(invalstart))
+
+	wg.Wait()
 
 	return true, nil
 }
