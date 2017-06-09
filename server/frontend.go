@@ -131,6 +131,7 @@ type frontendImpl struct {
 
 	sessions  AtomicMap
 	lockLocks AtomicStringMap
+	setLocks  AtomicStringMap
 }
 
 func NewFrontend() (Server, error) {
@@ -159,6 +160,7 @@ func NewFrontendWithFSM(fsm FSM, stateChanges <-chan ClusterState) (Server, erro
 		fsm:       fsm,
 		sessions:  NewAtomicMap(),
 		lockLocks: NewAtomicStringMapWithDefault(func(string) interface{} { return &sync.Mutex{} }),
+		setLocks:  NewAtomicStringMapWithDefault(func(string) interface{} { return &sync.Mutex{} }),
 	}
 
 	cs := <-stateChanges
@@ -182,6 +184,7 @@ func (fe *frontendImpl) setClusterState(cs ClusterState) {
 	if wasLeader && !cs.IsLeader {
 		fe.sessions = NewAtomicMap()
 		fe.lockLocks = NewAtomicStringMapWithDefault(func(string) interface{} { return &sync.Mutex{} })
+		fe.setLocks = NewAtomicStringMapWithDefault(func(string) interface{} { return &sync.Mutex{} })
 	} else if !wasLeader && cs.IsLeader {
 		sds := fe.fsm.GetSessionDescriptors()
 		for _, sd := range sds {
@@ -192,6 +195,8 @@ func (fe *frontendImpl) setClusterState(cs ClusterState) {
 		// TODO: make double failover work properly
 		unfinalized := fe.fsm.GetUnfinalizedNodes()
 		for _, ni := range unfinalized {
+			mut := fe.setLocks.Get(ni.path).(*sync.Mutex)
+			mut.Lock()
 			go fe.finalizeSetContent(ni)
 		}
 	}
@@ -368,8 +373,12 @@ func (fe *frontendImpl) SetContent(nd NodeDescriptor, content string, generation
 		return false, ErrReadOnlyNodeDescriptor
 	}
 
+	mut := fe.setLocks.Get(nid.ni.path).(*sync.Mutex)
+	mut.Lock()
+
 	ok := fe.fsm.PrepareSetContent(nd, NodeContentAndStat{content, NodeStat{generation, time.Now()}})
 	if !ok {
+		mut.Unlock()
 		return false, nil
 	}
 
@@ -410,4 +419,7 @@ func (fe *frontendImpl) finalizeSetContent(ni *nodeInfo) {
 	wg.Wait()
 
 	fe.fsm.FinalizeSetContent(ni.path)
+
+	mut := fe.setLocks.Get(ni.path).(*sync.Mutex)
+	mut.Unlock()
 }
