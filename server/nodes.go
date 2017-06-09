@@ -19,6 +19,7 @@ type nodeInfo struct {
 	content      string
 	lastModified time.Time
 	generation   uint64
+	finalized    bool
 	lock         sync.RWMutex
 	locker       *nodeDescriptor
 }
@@ -47,7 +48,14 @@ func (ni *nodeInfo) SetContent(content string, generation uint64) bool {
 	ni.content = content
 	ni.lastModified = time.Now()
 	ni.generation += 1
+	ni.finalized = false
 	return true
+}
+
+func (ni *nodeInfo) FinalizeSetContent() {
+	ni.lock.Lock()
+	defer ni.lock.Unlock()
+	ni.finalized = true
 }
 
 func (ni *nodeInfo) SetLocked(locker *nodeDescriptor) {

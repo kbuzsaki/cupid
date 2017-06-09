@@ -14,7 +14,8 @@ const (
 	closeNodeProposalType
 	tryAcquireProposalType
 	releaseProposalType
-	setContentProposalType
+	prepareSetContentProposalType
+	finalizeSetContentProposalType
 )
 
 type Proposal struct {
@@ -25,7 +26,8 @@ type Proposal struct {
 	*CloseNodeProposal
 	*TryAcquireProposal
 	*ReleaseProposal
-	*SetContentProposal
+	*PrepareSetContentProposal
+	*FinalizeSetContentProposal
 }
 
 func (p *Proposal) Get() interface{} {
@@ -42,8 +44,10 @@ func (p *Proposal) Get() interface{} {
 		return *p.TryAcquireProposal
 	case releaseProposalType:
 		return *p.ReleaseProposal
-	case setContentProposalType:
-		return *p.SetContentProposal
+	case prepareSetContentProposalType:
+		return *p.PrepareSetContentProposal
+	case finalizeSetContentProposalType:
+		return *p.FinalizeSetContentProposal
 	default:
 		return nil
 	}
@@ -108,14 +112,23 @@ func (rp *ReleaseProposal) Wrap() Proposal {
 	return Proposal{Type: releaseProposalType, ReleaseProposal: rp}
 }
 
-type SetContentProposal struct {
+type PrepareSetContentProposal struct {
 	ID  uint64
 	ND  NodeDescriptor
 	CAS NodeContentAndStat
 }
 
-func (scp *SetContentProposal) Wrap() Proposal {
-	return Proposal{Type: setContentProposalType, SetContentProposal: scp}
+func (scp *PrepareSetContentProposal) Wrap() Proposal {
+	return Proposal{Type: prepareSetContentProposalType, PrepareSetContentProposal: scp}
+}
+
+type FinalizeSetContentProposal struct {
+	ID uint64
+	ND NodeDescriptor
+}
+
+func (fcp *FinalizeSetContentProposal) Wrap() Proposal {
+	return Proposal{Type: finalizeSetContentProposalType, FinalizeSetContentProposal: fcp}
 }
 
 func Encode(proposal Proposal) string {
@@ -136,17 +149,18 @@ func Decode(s string) interface{} {
 
 func NewRaftFSM(proposeC chan<- string, committedC <-chan *string, delegate FSM) FSM {
 	fsm := &raftFSMImpl{
-		proposeC:         proposeC,
-		committedC:       committedC,
-		delegate:         delegate,
-		id:               0,
-		openSessionAcks:  NewAtomicMap(),
-		closeSessionAcks: NewAtomicMap(),
-		openNodeAcks:     NewAtomicMap(),
-		closeNodeAcks:    NewAtomicMap(),
-		tryAcquireAcks:   NewAtomicMap(),
-		releaseAcks:      NewAtomicMap(),
-		setContentAcks:   NewAtomicMap(),
+		proposeC:               proposeC,
+		committedC:             committedC,
+		delegate:               delegate,
+		id:                     0,
+		openSessionAcks:        NewAtomicMap(),
+		closeSessionAcks:       NewAtomicMap(),
+		openNodeAcks:           NewAtomicMap(),
+		closeNodeAcks:          NewAtomicMap(),
+		tryAcquireAcks:         NewAtomicMap(),
+		releaseAcks:            NewAtomicMap(),
+		setContentAcks:         NewAtomicMap(),
+		finalizeSetContentAcks: NewAtomicMap(),
 	}
 
 	go fsm.readFromLog()
@@ -161,13 +175,14 @@ type raftFSMImpl struct {
 
 	id uint64
 
-	openSessionAcks  AtomicMap
-	closeSessionAcks AtomicMap
-	openNodeAcks     AtomicMap
-	closeNodeAcks    AtomicMap
-	tryAcquireAcks   AtomicMap
-	releaseAcks      AtomicMap
-	setContentAcks   AtomicMap
+	openSessionAcks        AtomicMap
+	closeSessionAcks       AtomicMap
+	openNodeAcks           AtomicMap
+	closeNodeAcks          AtomicMap
+	tryAcquireAcks         AtomicMap
+	releaseAcks            AtomicMap
+	setContentAcks         AtomicMap
+	finalizeSetContentAcks AtomicMap
 }
 
 func (fsm *raftFSMImpl) nextId() uint64 {
@@ -234,6 +249,10 @@ func (fsm *raftFSMImpl) GetNodeDescriptor(nd NodeDescriptor) *nodeDescriptor {
 	return fsm.delegate.GetNodeDescriptor(nd)
 }
 
+func (fsm *raftFSMImpl) GetUnfinalizedNodes() []*nodeInfo {
+	return fsm.delegate.GetUnfinalizedNodes()
+}
+
 func (fsm *raftFSMImpl) SetLocked(nd NodeDescriptor) {
 	id := fsm.nextId()
 
@@ -262,16 +281,28 @@ func (fsm *raftFSMImpl) GetContentAndStat(nd NodeDescriptor) NodeContentAndStat 
 	return fsm.delegate.GetContentAndStat(nd)
 }
 
-func (fsm *raftFSMImpl) SetContent(nd NodeDescriptor, cas NodeContentAndStat) bool {
+func (fsm *raftFSMImpl) PrepareSetContent(nd NodeDescriptor, cas NodeContentAndStat) bool {
 	id := fsm.nextId()
 
 	ac := make(chan bool)
 	fsm.setContentAcks.Put(id, ac)
 
-	proposal := SetContentProposal{ID: id, ND: nd, CAS: cas}
+	proposal := PrepareSetContentProposal{ID: id, ND: nd, CAS: cas}
 	fsm.proposeC <- Encode(proposal.Wrap())
 
 	return <-ac
+}
+
+func (fsm *raftFSMImpl) FinalizeSetContent(nd NodeDescriptor) {
+	id := fsm.nextId()
+
+	ac := make(chan bool)
+	fsm.finalizeSetContentAcks.Put(id, ac)
+
+	proposal := FinalizeSetContentProposal{ID: id, ND: nd}
+	fsm.proposeC <- Encode(proposal.Wrap())
+
+	<-ac
 }
 
 func (fsm *raftFSMImpl) readFromLog() {
@@ -313,10 +344,15 @@ func (fsm *raftFSMImpl) readFromLog() {
 			if ch := fsm.releaseAcks.Get(p.ID); ch != nil {
 				ch.(chan bool) <- succ
 			}
-		case SetContentProposal:
-			succ := fsm.delegate.SetContent(p.ND, p.CAS)
+		case PrepareSetContentProposal:
+			succ := fsm.delegate.PrepareSetContent(p.ND, p.CAS)
 			if ch := fsm.setContentAcks.Get(p.ID); ch != nil {
 				ch.(chan bool) <- succ
+			}
+		case FinalizeSetContentProposal:
+			fsm.delegate.FinalizeSetContent(p.ND)
+			if ch := fsm.finalizeSetContentAcks.Get(p.ID); ch != nil {
+				ch.(chan bool) <- true
 			}
 		default:
 			log.Println("unrecognized operation:", proposal)

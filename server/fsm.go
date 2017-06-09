@@ -12,14 +12,14 @@ type FSM interface {
 	OpenNode(sd SessionDescriptor, path string, readOnly bool, config EventsConfig) NodeDescriptor
 	CloseNode(nd NodeDescriptor)
 	GetNodeDescriptor(nd NodeDescriptor) *nodeDescriptor
+	GetUnfinalizedNodes() []*nodeInfo
 
 	SetLocked(nd NodeDescriptor)
 	ReleaseLock(nd NodeDescriptor) bool
 
 	GetContentAndStat(nd NodeDescriptor) NodeContentAndStat
-	SetContent(nd NodeDescriptor, cas NodeContentAndStat) bool
-	//PrepareSetContent()
-	//CompleteSetContent()
+	PrepareSetContent(nd NodeDescriptor, cas NodeContentAndStat) bool
+	FinalizeSetContent(nd NodeDescriptor)
 }
 
 type fsmImpl struct {
@@ -84,6 +84,10 @@ func (fsm *fsmImpl) GetNodeDescriptor(nd NodeDescriptor) *nodeDescriptor {
 	return fsm.sessions.GetDescriptor(nd)
 }
 
+func (fsm *fsmImpl) GetUnfinalizedNodes() []*nodeInfo {
+	return fsm.nodes.GetUnfinalizedNodes()
+}
+
 func (fsm *fsmImpl) SetLocked(nd NodeDescriptor) {
 	nid := fsm.sessions.GetDescriptor(nd)
 	if nid == nil {
@@ -114,7 +118,7 @@ func (fsm *fsmImpl) GetContentAndStat(nd NodeDescriptor) NodeContentAndStat {
 	return nid.ni.GetContentAndStat()
 }
 
-func (fsm *fsmImpl) SetContent(nd NodeDescriptor, cas NodeContentAndStat) bool {
+func (fsm *fsmImpl) PrepareSetContent(nd NodeDescriptor, cas NodeContentAndStat) bool {
 	nid := fsm.sessions.GetDescriptor(nd)
 	if nid == nil {
 		log.Println("fsm.GetContentAndStat got invalid node descriptor:", nd)
@@ -123,4 +127,14 @@ func (fsm *fsmImpl) SetContent(nd NodeDescriptor, cas NodeContentAndStat) bool {
 
 	// TODO: fix this to use cas.Stat.LastModified?
 	return nid.ni.SetContent(cas.Content, cas.Stat.Generation)
+}
+
+func (fsm *fsmImpl) FinalizeSetContent(nd NodeDescriptor) {
+	nid := fsm.sessions.GetDescriptor(nd)
+	if nid == nil {
+		log.Println("fsm.GetContentAndStat got invalid node descriptor:", nd)
+	}
+
+	// TODO: include generation somehow?
+	nid.ni.FinalizeSetContent()
 }

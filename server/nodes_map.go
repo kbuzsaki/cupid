@@ -36,3 +36,17 @@ func (nim *nodeInfoMap) GetOrCreateNode(path string) *nodeInfo {
 
 	return nim.CreateNode(path)
 }
+
+func (nim *nodeInfoMap) GetUnfinalizedNodes() []*nodeInfo {
+	nim.lock.RLock()
+	defer nim.lock.RUnlock()
+
+	var unfinalized []*nodeInfo
+	for key := range nim.data {
+		ni := nim.data[key]
+		if !ni.finalized {
+			unfinalized = append(unfinalized, ni)
+		}
+	}
+	return unfinalized
+}

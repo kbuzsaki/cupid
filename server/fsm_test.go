@@ -22,7 +22,7 @@ func BenchmarkFsmImpl_SetContent(b *testing.B) {
 	}
 
 	// initial set content to check correctness
-	fsm.SetContent(nd, cas)
+	fsm.PrepareSetContent(nd, cas)
 	getCas := fsm.GetContentAndStat(nd)
 	if cas.Content != getCas.Content {
 		b.Error("set content failed")
@@ -31,7 +31,7 @@ func BenchmarkFsmImpl_SetContent(b *testing.B) {
 	cas.Content = "some other content"
 
 	for n := 0; n < b.N; n++ {
-		fsm.SetContent(nd, cas)
+		fsm.PrepareSetContent(nd, cas)
 	}
 
 	getCas2 := fsm.GetContentAndStat(nd)
@@ -57,7 +57,7 @@ func BenchmarkFsmImpl_SetContentNoOp(b *testing.B) {
 	}
 
 	// initial set content to check correctness
-	fsm.SetContent(nd, cas)
+	fsm.PrepareSetContent(nd, cas)
 	getCas := fsm.GetContentAndStat(nd)
 	if cas.Content != getCas.Content {
 		b.Error("set content failed")
@@ -66,7 +66,7 @@ func BenchmarkFsmImpl_SetContentNoOp(b *testing.B) {
 	cas.Content = "some other content"
 
 	for n := 0; n < b.N; n++ {
-		fsm.SetContent(nd, cas)
+		fsm.PrepareSetContent(nd, cas)
 	}
 
 	getCas2 := fsm.GetContentAndStat(nd)

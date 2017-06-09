@@ -1,6 +1,9 @@
 package server
 
-import "testing"
+import (
+	"testing"
+	"time"
+)
 
 // These test functions just immediately delegate to the shared tester functions in server_test_common.go
 
@@ -65,4 +68,45 @@ func TestFrontend_BadRelease(t *testing.T) {
 	}
 
 	DoServerTest_BadRelease(t, s)
+}
+
+func TestFrontendImpl_SetContentFailover(t *testing.T) {
+	fsm, err := NewFSM()
+	if err != nil {
+		t.Fatal("unable to create fsm:", err)
+	}
+
+	// grab a session and node descriptor
+	sd := fsm.OpenSession()
+	nd := fsm.OpenNode(sd, "/foo", false, EventsConfig{ContentModified: true})
+
+	nid := fsm.GetNodeDescriptor(nd)
+
+	// add an incomplete SetContent to run failover for
+	fsm.PrepareSetContent(nd, NodeContentAndStat{Content: "new set", Stat: NodeStat{Generation: 10, LastModified: time.Now()}})
+
+	stateC := make(chan ClusterState, 1)
+	stateC <- ClusterState{true, 1, ""}
+	s, err := NewFrontendWithFSM(fsm, stateC)
+	if err != nil {
+		t.Fatal("unable to create frontend with fsm:")
+	}
+
+	// check in for events
+	events, err := s.KeepAlive(LeaseInfo{Session: sd}, []EventInfo{{nd, 0, true}}, time.Second)
+	if len(events) != 1 {
+		t.Error("events slice was not unary:", events)
+	} else {
+		if e, ok := events[0].(ContentInvalidationPushEvent); !ok {
+			t.Errorf("event was not content invalidation push, was: %#v", events[0])
+		} else {
+			if e.Descriptor != nd {
+				t.Error("wrong descriptor:", e.Descriptor, "expected:", nd)
+			}
+			if e.Content != "new set" {
+				t.Error("wrong content:", e.Content, "expected: 'new set'")
+			}
+		}
+	}
+
 }
