@@ -19,7 +19,7 @@ type FSM interface {
 
 	GetContentAndStat(nd NodeDescriptor) NodeContentAndStat
 	PrepareSetContent(nd NodeDescriptor, cas NodeContentAndStat) bool
-	FinalizeSetContent(nd NodeDescriptor)
+	FinalizeSetContent(path string)
 }
 
 type fsmImpl struct {
@@ -129,12 +129,12 @@ func (fsm *fsmImpl) PrepareSetContent(nd NodeDescriptor, cas NodeContentAndStat)
 	return nid.ni.SetContent(cas.Content, cas.Stat.Generation)
 }
 
-func (fsm *fsmImpl) FinalizeSetContent(nd NodeDescriptor) {
-	nid := fsm.sessions.GetDescriptor(nd)
-	if nid == nil {
-		log.Println("fsm.GetContentAndStat got invalid node descriptor:", nd)
+func (fsm *fsmImpl) FinalizeSetContent(path string) {
+	ni := fsm.nodes.GetNode(path)
+	if ni == nil {
+		log.Println("fsm.GetContentAndStat got invalid node info:", path)
 	}
 
 	// TODO: include generation somehow?
-	nid.ni.FinalizeSetContent()
+	ni.FinalizeSetContent()
 }

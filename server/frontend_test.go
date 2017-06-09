@@ -89,7 +89,7 @@ func TestFrontendImpl_SetContentFailover(t *testing.T) {
 	stateC <- ClusterState{true, 1, ""}
 	s, err := NewFrontendWithFSM(fsm, stateC)
 	if err != nil {
-		t.Fatal("unable to create frontend with fsm:")
+		t.Fatal("unable to create frontend with fsm:", err)
 	}
 
 	// check in for events
@@ -109,4 +109,12 @@ func TestFrontendImpl_SetContentFailover(t *testing.T) {
 		}
 	}
 
+	ok, err := s.SetContent(nd, "final set", 10)
+	if err != nil || !ok {
+		t.Error("failed to do final set")
+	}
+
+	if !nid.ni.finalized {
+		t.Error("not finalized")
+	}
 }

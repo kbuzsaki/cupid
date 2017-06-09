@@ -76,7 +76,7 @@ func (sc *sessionConn) IsAlive() bool {
 }
 
 // SendEvent sends an event to this session and either blocks until the session acks it or times out
-func (sc *sessionConn) SendEvent(event Event, wait bool) bool {
+func (sc *sessionConn) SendEvent(event Event) bool {
 	ac := make(chan struct{})
 
 	sc.eventLock.Lock()
@@ -85,7 +85,7 @@ func (sc *sessionConn) SendEvent(event Event, wait bool) bool {
 
 	sc.signaler.Signal()
 
-	if !sc.IsAlive() || !wait {
+	if !sc.IsAlive() {
 		return false
 	}
 
@@ -189,13 +189,10 @@ func (fe *frontendImpl) setClusterState(cs ClusterState) {
 		}
 
 		// TODO: finish propagating events
-		sd := fe.fsm.OpenSession()
-		defer fe.fsm.CloseSession(sd)
+		// TODO: make double failover work properly
 		unfinalized := fe.fsm.GetUnfinalizedNodes()
 		for _, ni := range unfinalized {
-			nd := fe.fsm.OpenNode(sd, ni.path, false, EventsConfig{})
-			defer fe.fsm.CloseNode(nd)
-			fe.finalizeSetContent(nd, false)
+			go fe.finalizeSetContent(ni)
 		}
 	}
 }
@@ -315,7 +312,7 @@ func (fe *frontendImpl) TryAcquire(nd NodeDescriptor) (bool, error) {
 		// TODO: what if the leader dies here?
 		fe.fsm.SetLocked(nd)
 		lockInvalidationEvent := LockInvalidationEvent{currentLocker.GetND()}
-		lockerSession.SendEvent(lockInvalidationEvent, true)
+		lockerSession.SendEvent(lockInvalidationEvent)
 		return true, nil
 	}
 
@@ -364,9 +361,10 @@ func (fe *frontendImpl) SetContent(nd NodeDescriptor, content string, generation
 		return false, cs.MakeRedirectError()
 	}
 
-	if node := fe.fsm.GetNodeDescriptor(nd); node == nil {
+	var nid *nodeDescriptor
+	if nid = fe.fsm.GetNodeDescriptor(nd); nid == nil {
 		return false, ErrInvalidNodeDescriptor
-	} else if node.readOnly {
+	} else if nid.readOnly {
 		return false, ErrReadOnlyNodeDescriptor
 	}
 
@@ -375,15 +373,15 @@ func (fe *frontendImpl) SetContent(nd NodeDescriptor, content string, generation
 		return false, nil
 	}
 
-	fe.finalizeSetContent(nd, true)
+	fe.finalizeSetContent(nid.ni)
 
 	return true, nil
 }
 
-func (fe *frontendImpl) finalizeSetContent(nd NodeDescriptor, wait bool) {
+func (fe *frontendImpl) finalizeSetContent(ni *nodeInfo) {
 	wg := sync.WaitGroup{}
 
-	cas := fe.fsm.GetContentAndStat(nd)
+	cas := ni.GetContentAndStat()
 	sds := fe.sessions.Keys()
 	for _, sd := range sds {
 		if sd == uint64(nd.Session.Descriptor) {
@@ -396,26 +394,20 @@ func (fe *frontendImpl) finalizeSetContent(nd NodeDescriptor, wait bool) {
 		}
 
 		cs := fe.fsm.GetSession(SessionDescriptor{descriptorKey(sd)})
-		keys := cs.GetDescriptorKeys(nd.Path)
-		if wait {
-			wg.Add(len(keys))
-		}
+		keys := cs.GetDescriptorKeys(ni.path)
+		wg.Add(len(keys))
 
 		for _, key := range keys {
 			go func(key descriptorKey) {
-				snd := NodeDescriptor{SessionDescriptor{cs.key}, key, nd.Path}
+				snd := NodeDescriptor{SessionDescriptor{cs.key}, key, ni.path}
 				event := createInvalidationEvent(snd, cas, fe.fsm.GetNodeDescriptor(snd).config)
-
-				session.SendEvent(event, true)
-				if wait {
-					wg.Done()
-				}
+				session.SendEvent(event)
+				wg.Done()
 			}(key)
 		}
 	}
 
 	wg.Wait()
 
-	fe.fsm.FinalizeSetContent(nd)
-
+	fe.fsm.FinalizeSetContent(ni.path)
 }

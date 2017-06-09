@@ -123,8 +123,8 @@ func (scp *PrepareSetContentProposal) Wrap() Proposal {
 }
 
 type FinalizeSetContentProposal struct {
-	ID uint64
-	ND NodeDescriptor
+	ID   uint64
+	Path string
 }
 
 func (fcp *FinalizeSetContentProposal) Wrap() Proposal {
@@ -293,13 +293,13 @@ func (fsm *raftFSMImpl) PrepareSetContent(nd NodeDescriptor, cas NodeContentAndS
 	return <-ac
 }
 
-func (fsm *raftFSMImpl) FinalizeSetContent(nd NodeDescriptor) {
+func (fsm *raftFSMImpl) FinalizeSetContent(path string) {
 	id := fsm.nextId()
 
 	ac := make(chan bool)
 	fsm.finalizeSetContentAcks.Put(id, ac)
 
-	proposal := FinalizeSetContentProposal{ID: id, ND: nd}
+	proposal := FinalizeSetContentProposal{ID: id, Path: path}
 	fsm.proposeC <- Encode(proposal.Wrap())
 
 	<-ac
@@ -350,7 +350,7 @@ func (fsm *raftFSMImpl) readFromLog() {
 				ch.(chan bool) <- succ
 			}
 		case FinalizeSetContentProposal:
-			fsm.delegate.FinalizeSetContent(p.ND)
+			fsm.delegate.FinalizeSetContent(p.Path)
 			if ch := fsm.finalizeSetContentAcks.Get(p.ID); ch != nil {
 				ch.(chan bool) <- true
 			}
