@@ -393,9 +393,6 @@ func (fe *frontendImpl) finalizeSetContent(ni *nodeInfo) {
 	cas := ni.GetContentAndStat()
 	sds := fe.sessions.Keys()
 	for _, sd := range sds {
-		if sd == uint64(nd.Session.Descriptor) {
-			continue
-		}
 		// if the session has been closed since, just ignore it
 		session, ok := fe.sessions.Get(sd).(*sessionConn)
 		if !ok {
