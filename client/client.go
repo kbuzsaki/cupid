@@ -7,6 +7,7 @@ import (
 
 	"github.com/kbuzsaki/cupid/rpcclient"
 	"github.com/kbuzsaki/cupid/server"
+	"fmt"
 )
 
 const (
@@ -121,9 +122,9 @@ func (cl *clientImpl) keepAlive() {
 	for !cl.isClosing() {
 		li := cl.locks.GetLeaseInfo()
 		li.Session = cl.sd
-		//start := time.Now()
+		start := time.Now()
 		events, err := cl.s.KeepAlive(li, cl.nodeCache.GetEventInfos(), cl.keepAliveDelay)
-		//fmt.Println(time.Since(start))
+		fmt.Println(time.Since(start))
 		if err != nil {
 			log.Println("KeepAlive error:", err)
 			time.Sleep(connectionErrorBackoff)

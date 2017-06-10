@@ -22,11 +22,6 @@ type RedirectServer struct {
 func unmarshalRedirectError(se string) (server.LeaderRedirectError, error) {
 	var lre server.LeaderRedirectError
 	err := json.Unmarshal([]byte(se), &lre)
-	if err == nil {
-		log.Println(lre.LeaderID)
-	} else {
-		log.Println("Error unmarshalling redirect error")
-	}
 	return lre, err
 }
 

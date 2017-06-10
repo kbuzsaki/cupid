@@ -12,17 +12,17 @@ ADDRESSES = [
     "127.0.0.1:32380",
 ]
 
-def launch_publisher(addresses, topic, count, stdout=DEVNULL):
+def launch_publisher_proc(addresses, topic, count, publishers, stdout=DEVNULL):
     addrstr = ",".join(addresses)
-    args = [CLIENT, "-addrs", addrstr, "-publish", "-topic", topic, "-count", str(count)]
-    daemon = Popen(args, stdout=stdout)
+    args = [CLIENT, "-addrs", addrstr, "-publish", "-topic", topic, "-count", str(count), "-pubs", str(publishers)]
+    daemon = Popen(args, stdout=PIPE)
     if daemon.poll():
         raise Exception("failed to init publisher")
     return daemon
 
-def launch_subscriber(addresses, topic, stdout=DEVNULL):
+def launch_subscriber_proc(addresses, topic, subscribers, stdout=DEVNULL):
     addrstr = ",".join(addresses)
-    args = [CLIENT, "-addrs", addrstr, "-topic", topic]
+    args = [CLIENT, "-addrs", addrstr, "-topic", topic, "-subs", str(subscribers)]
     daemon = Popen(args, stdout=stdout, stderr=DEVNULL)
     if daemon.poll():
         raise Exception("failed to init publisher")
@@ -34,11 +34,12 @@ def launch_daemons(launcher, count, *args, **kwargs):
         daemons.append(launcher(*args, **kwargs))
     return daemons
 
-def do_simple_perf_test(publishers, subscribers, topic, count):
-    subscribe_daemons = launch_daemons(launch_subscriber, subscribers, ADDRESSES, topic)
+def do_simple_perf_test(publishers, subscribers, topic, messages, sprocs, pprocs):
+    subscribe_daemons = launch_daemons(launch_subscriber_proc, sprocs, ADDRESSES, topic, subscribers)
 
     start = datetime.now()
-    publish_daemons = launch_daemons(launch_publisher, publishers, ADDRESSES, topic, count)
+    publish_daemons = launch_daemons(launch_publisher_proc, pprocs, ADDRESSES, topic, messages, publishers)
+
     for pd in publish_daemons:
         pd.wait()
     end = datetime.now()
@@ -46,18 +47,20 @@ def do_simple_perf_test(publishers, subscribers, topic, count):
     delta = end - start
     print("time:", delta)
 
-def do_keep_alive_perf_test(subscribers, topic):
-    subscribe_daemons = launch_daemons(launch_subscriber, subscribers, ADDRESSES, topic, stdout=PIPE)
+def do_keep_alive_perf_test(subscribers, topic, procs):
+    subscribe_daemons = launch_daemons(launch_subscriber_proc, procs, ADDRESSES, topic, subscribers, stdout=PIPE)
     time.sleep(30)
-    pd = launch_daemons(launch_publisher, 1, ADDRESSES, topic, 0)
+    pd = launch_daemons(launch_publisher_proc, 1, ADDRESSES, topic, 0, 1)
     pd[0].wait()
 
     all_measurements = []
     for sd in subscribe_daemons:
         stdout, stderr = sd.communicate()
         output = stdout.decode("utf8")
+        print(output)
         measurements = output.split('\n')[:-2] #last measurement is from the publisher
-        measurements = [float(x[:-1]) for x in measurements] #drop the 's' from the time
+        print(measurements)
+        measurements = [removeSuffix(x) for x in measurements] #drop the 's' from the time
         all_measurements.extend(measurements)
 
     print_stats(all_measurements)
@@ -81,14 +84,14 @@ def removeSuffix(duration):
     duration *= 1000
     return duration
 
-def do_lock_perf_test(count, topic):
-    locker_daemons = launch_daemons(launch_locker, 1, count, ADDRESSES, topic, stdout=PIPE)
-    ld = locker_daemons[0]
-    measurements = []
-    stdout, stderr = ld.communicate()
-    measurements = stdout.decode("utf8").split("\n")[:-1]
-    measurements = [removeSuffix(x) for x in measurements]
-    print_stats(measurements)
+def do_lock_perf_test(count, topic, procs):
+    locker_daemons = launch_daemons(launch_locker, procs, count, ADDRESSES, topic, stdout=PIPE)
+    all_measurements = []
+    for ld in locker_daemons:
+        stdout, stderr = ld.communicate()
+        measurements = stdout.decode("utf8").split("\n")[:-1]
+        all_measurements.extend([removeSuffix(x) for x in measurements])
+    print_stats(all_measurements)
 
 def print_stats(measurements):
     print("mean:", statistics.mean(measurements))
@@ -97,13 +100,55 @@ def print_stats(measurements):
     print("max:", max(measurements))
     print("min:", min(measurements))
 
+def maybe_help(target_len, actual_len):
+    should_print = target_len is not actual_len
+    if should_print:
+        print_help()
+    return should_print
+
+def print_help():
+    print("python3 perf_test.py -locker [topic] [iterations] [procs]")
+    print("python3 perf_test.py -pubsub [topic] [messages] [subscribers] [publishers] [sprocs] [pprocs]")
+    print("python3 perf_test.py -keepalive [topic] [iterations] [procs]")
+
 if __name__ == "__main__":
-    if sys.argv[1] == "-locker":
+
+    if len(sys.argv) is 1:
+        print_help()
+        exit()
+
+    cmd = sys.argv[1]
+
+    if cmd == "-help":
+        print_help()
+        exit()
+
+    if cmd == "-locker":
+        if maybe_help(5, len(sys.argv)):
+            exit()
         topic = sys.argv[2]
         count = int(sys.argv[3])
-        do_lock_perf_test(count, topic)
-    else:
-        topic = sys.argv[1]
-        count = int(sys.argv[2])
-        do_simple_perf_test(1, 200, topic, count)
-        do_keep_alive_perf_test(count, topic)
+        procs = int(sys.argv[4])
+        do_lock_perf_test(count, topic, procs)
+        exit()
+
+    if cmd == "-pubsub":
+        if maybe_help(8, len(sys.argv)):
+            exit()
+        topic = sys.argv[2]
+        messages = int(sys.argv[3])
+        subscribers = int(sys.argv[4])
+        publishers = int(sys.argv[5])
+        sprocs = int(sys.argv[6])
+        pprocs = int(sys.argv[7])
+        do_simple_perf_test(publishers, subscribers, topic, messages, sprocs, pprocs)
+        exit()
+
+    if cmd == "-keepalive":
+        if maybe_help(5, len(sys.argv)):
+            exit()
+        topic = sys.argv[2]
+        iterations = int(sys.argv[3])
+        procs = int(sys.argv[4])
+        do_keep_alive_perf_test(iterations, topic, procs)
+        exit()
