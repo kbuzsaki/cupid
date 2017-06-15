@@ -148,3 +148,12 @@ func (cl *client) SetContent(args *SetContentArgs, success *bool) error {
 
 	return conn.Call("Cupid.SetContent", args, success)
 }
+
+func (cl *client) Nop(numOps uint64, garbage *bool) error {
+	conn, err := cl.getConn()
+	if err != nil {
+		return err
+	}
+
+	return conn.Call("Cupid.Nop", numOps, garbage)
+}

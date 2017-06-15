@@ -22,6 +22,8 @@ type RPCServer interface {
 
 	GetContentAndStat(node server.NodeDescriptor, cas *server.NodeContentAndStat) error
 	SetContent(args *SetContentArgs, success *bool) error
+
+	Nop(numOps uint64, garbage *bool) error
 }
 
 type KeepAliveArgs struct {
@@ -131,4 +133,8 @@ func (rs *rpcServer) SetContent(args *SetContentArgs, success *bool) error {
 
 	*success = succ
 	return nil
+}
+
+func (rs *rpcServer) Nop(numOps uint64, garbage *bool) error {
+	return rs.delegate.Nop(numOps)
 }

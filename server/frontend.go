@@ -420,3 +420,13 @@ func (fe *frontendImpl) finalizeSetContent(ni *nodeInfo) {
 	mut := fe.setLocks.Get(ni.path).(*sync.Mutex)
 	mut.Unlock()
 }
+
+func (fe *frontendImpl) Nop(numOps uint64) error {
+	var i uint64 = 0
+
+	for ; i < numOps; i++ {
+		fe.fsm.Nop(0)
+	}
+
+	return nil
+}

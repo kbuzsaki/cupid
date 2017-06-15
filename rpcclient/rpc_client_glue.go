@@ -82,3 +82,8 @@ func (cg *clientGlue) SetContent(node server.NodeDescriptor, content string, gen
 	err := cg.delegate.SetContent(&setContentArgs, &ok)
 	return ok, err
 }
+
+func (cg *clientGlue) Nop(numOps uint64) error {
+	a := true
+	return cg.delegate.Nop(numOps, &a)
+}

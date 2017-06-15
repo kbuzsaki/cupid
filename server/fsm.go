@@ -1,6 +1,8 @@
 package server
 
-import "log"
+import (
+	"log"
+)
 
 // TODO: does this need a keepalive? where should keepalive information live? maybe just the front end?
 type FSM interface {
@@ -20,6 +22,8 @@ type FSM interface {
 	GetContentAndStat(nd NodeDescriptor) NodeContentAndStat
 	PrepareSetContent(nd NodeDescriptor, cas NodeContentAndStat) bool
 	FinalizeSetContent(path string)
+
+	Nop(garbage int)
 }
 
 type fsmImpl struct {
@@ -137,4 +141,7 @@ func (fsm *fsmImpl) FinalizeSetContent(path string) {
 
 	// TODO: include generation somehow?
 	ni.FinalizeSetContent()
+}
+
+func (fsm *fsmImpl) Nop(garbage int) {
 }

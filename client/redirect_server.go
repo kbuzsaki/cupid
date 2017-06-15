@@ -259,3 +259,21 @@ func (rs *RedirectServer) SetContent(node server.NodeDescriptor, content string,
 	}
 	return ok, err
 }
+
+func (rs *RedirectServer) Nop(numOps uint64) error {
+	err := rs.getLeader().Nop(numOps)
+	if err == nil {
+		rs.stabilizeLeader()
+		return nil
+	} else if se, ok := err.(rpc.ServerError); ok {
+		if lre, err := unmarshalRedirectError(se.Error()); err == nil {
+			rs.setLeader(lre.LeaderID)
+			return rs.Nop(numOps)
+		}
+		return err
+	} else {
+		rs.abortLeader()
+		return rs.Nop(numOps)
+	}
+
+}

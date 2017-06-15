@@ -12,9 +12,9 @@ ADDRESSES = [
     "127.0.0.1:32380",
 ]
 
-def launch_publisher_proc(addresses, topic, count, publishers, stdout=DEVNULL):
+def launch_publisher_proc(addresses, topic, numGoRoutines, publishers, stdout=DEVNULL):
     addrstr = ",".join(addresses)
-    args = [CLIENT, "-addrs", addrstr, "-publish", "-topic", topic, "-count", str(count), "-pubs", str(publishers)]
+    args = [CLIENT, "-addrs", addrstr, "-publish", "-topic", topic, "-numGoRoutines", str(numGoRoutines), "-pubs", str(publishers)]
     daemon = Popen(args, stdout=PIPE)
     if daemon.poll():
         raise Exception("failed to init publisher")
@@ -28,9 +28,9 @@ def launch_subscriber_proc(addresses, topic, subscribers, stdout=DEVNULL):
         raise Exception("failed to init publisher")
     return daemon
 
-def launch_daemons(launcher, count, *args, **kwargs):
+def launch_daemons(launcher, numGoRoutines, *args, **kwargs):
     daemons = []
-    for _ in range(count):
+    for _ in range(numGoRoutines):
         daemons.append(launcher(*args, **kwargs))
     return daemons
 
@@ -57,48 +57,56 @@ def do_keep_alive_perf_test(subscribers, topic, procs):
     for sd in subscribe_daemons:
         stdout, stderr = sd.communicate()
         output = stdout.decode("utf8")
-        print(output)
         measurements = output.split('\n')[:-2] #last measurement is from the publisher
-        print(measurements)
-        measurements = [removeSuffix(x) for x in measurements] #drop the 's' from the time
         all_measurements.extend(measurements)
 
     print_stats(all_measurements)
 
-def launch_locker(count, addresses, topic, stdout=DEVNULL):
+def launch_locker(numGoRoutines, iterations, addresses, topic, stdout=DEVNULL):
     addrstr = ",".join(addresses)
-    args = [CLIENT, "-locker", "-addrs", addrstr, "-topic", topic, "-count", str(count)]
+    args = [CLIENT, "-locker", "-addrs", addrstr, "-topic", topic, "-numGoRoutines", str(numGoRoutines), "-iterations", str(iterations)]
     daemon = Popen(args, stdout=stdout, stderr=DEVNULL)
     if daemon.poll():
         raise Exception("failed to init locker")
     return daemon
 
-#takes in a time and strips the suffix and converts to ms if in s
-def removeSuffix(duration):
-    if "ms" in duration: 
-        return float(duration[:-2])
-
-    #suffix is 's'
-    duration = duration[:-1]
-    duration = float(duration)
-    duration *= 1000
-    return duration
-
-def do_lock_perf_test(count, topic, procs):
-    locker_daemons = launch_daemons(launch_locker, procs, count, ADDRESSES, topic, stdout=PIPE)
+def do_lock_perf_test(numGoRoutines, iterations, topic, procs):
+    locker_daemons = launch_daemons(launch_locker, procs, numGoRoutines, iterations, ADDRESSES, topic, stdout=PIPE)
     all_measurements = []
     for ld in locker_daemons:
         stdout, stderr = ld.communicate()
         measurements = stdout.decode("utf8").split("\n")[:-1]
-        all_measurements.extend([removeSuffix(x) for x in measurements])
+        all_measurements.extend(measurements)
     print_stats(all_measurements)
 
+def do_nop_perf_test(topic, numOps, iterations, goroutines, procs):
+    nop_daemons = launch_daemons(launch_noper, procs, ADDRESSES, topic, numOps, iterations, goroutines, stdout=PIPE)
+    all_measurements = []
+    for nd in nop_daemons:
+        stdout, stderr = nd.communicate()
+        measurements = stdout.decode("utf8").split("\n")[:-1]
+        all_measurements.extend(measurements)
+    print_stats(all_measurements)
+
+def launch_noper(addresses, topic, numOps, iterations, goroutines, stdout=DEVNULL):
+    addrstr = ",".join(addresses)
+    args = [CLIENT, "-nop", "-addrs", addrstr, "-topic", topic, "-numOps", str(numOps), "-numGoRoutines", str(goroutines), "-iterations", str(iterations)]
+    daemon = Popen(args, stdout=stdout, stderr=DEVNULL)
+    if daemon.poll():
+        raise Exception("failed to init noper")
+    return daemon
+
+def toMilli(ts):
+    return ts/1000000 #divide by 10^-6 to go from nano to milli
+
+
 def print_stats(measurements):
-    print("mean:", statistics.mean(measurements))
-    print("stdev:", statistics.stdev(measurements))
-    print("median:", statistics.median(measurements))
-    print("max:", max(measurements))
-    print("min:", min(measurements))
+    measurements = [float(x) for x in measurements]
+    print("mean   :", toMilli(statistics.mean(measurements)))
+    print("stdev  :", toMilli(statistics.stdev(measurements)))
+    print("median :", toMilli(statistics.median(measurements)))
+    print("max    :", toMilli(max(measurements)))
+    print("min    :", toMilli(min(measurements)))
 
 def maybe_help(target_len, actual_len):
     should_print = target_len is not actual_len
@@ -107,9 +115,10 @@ def maybe_help(target_len, actual_len):
     return should_print
 
 def print_help():
-    print("python3 perf_test.py -locker [topic] [iterations] [procs]")
-    print("python3 perf_test.py -pubsub [topic] [messages] [subscribers] [publishers] [sprocs] [pprocs]")
-    print("python3 perf_test.py -keepalive [topic] [iterations] [procs]")
+    print("python3 perf_test.py -locker     [topic] [numGoRoutines] [iterations] [procs]")
+    print("python3 perf_test.py -pubsub     [topic] [numMessages] [numSubscribers] [numPublishers] [sprocs] [pprocs]")
+    print("python3 perf_test.py -keepalive  [topic] [numGoRoutines] [procs]")
+    print("python3 perf_test.py -nop        [topic] [numOps] [goroutines] [iterations] [procs]")
 
 if __name__ == "__main__":
 
@@ -124,13 +133,13 @@ if __name__ == "__main__":
         exit()
 
     if cmd == "-locker":
-        if maybe_help(5, len(sys.argv)):
+        if maybe_help(6, len(sys.argv)):
             exit()
         topic = sys.argv[2]
-        count = int(sys.argv[3])
-        procs = int(sys.argv[4])
-        do_lock_perf_test(count, topic, procs)
-        exit()
+        numGoRoutines = int(sys.argv[3])
+        iterations = int(sys.argv[4])
+        procs = int(sys.argv[5])
+        do_lock_perf_test(numGoRoutines, iterations, topic, procs)
 
     if cmd == "-pubsub":
         if maybe_help(8, len(sys.argv)):
@@ -142,7 +151,6 @@ if __name__ == "__main__":
         sprocs = int(sys.argv[6])
         pprocs = int(sys.argv[7])
         do_simple_perf_test(publishers, subscribers, topic, messages, sprocs, pprocs)
-        exit()
 
     if cmd == "-keepalive":
         if maybe_help(5, len(sys.argv)):
@@ -151,4 +159,13 @@ if __name__ == "__main__":
         iterations = int(sys.argv[3])
         procs = int(sys.argv[4])
         do_keep_alive_perf_test(iterations, topic, procs)
-        exit()
+
+    if cmd == "-nop":
+        if maybe_help(7, len(sys.argv)):
+            exit()
+        topic = sys.argv[2]
+        numOps = int(sys.argv[3])
+        goroutines = int(sys.argv[4])
+        iterations = int(sys.argv[5])
+        procs = int(sys.argv[6])
+        do_nop_perf_test(topic, numOps, iterations, goroutines, procs)

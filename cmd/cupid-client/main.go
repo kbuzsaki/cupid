@@ -34,7 +34,8 @@ const (
 		"\tset <path> <value> <generation>" +
 		"\tlock <name>" +
 		"\ttrylock <name>" +
-		"\tunlock <name>"
+		"\tunlock <name>" +
+		"\tnop <path> <value>"
 	prompt = "> "
 )
 
@@ -155,6 +156,40 @@ func handleSet(args []string) bool {
 	return true
 }
 
+func parseNop(args []string) bool {
+	if len(args) == 0 {
+		path = ""
+	}
+
+	if len(args) >= 1 {
+		path = args[0]
+		value = args[1]
+		return true
+	}
+	return false
+}
+
+func handleNop(args []string) bool {
+	if maybePrintHelp(parseNop(args)) {
+		return true
+	}
+
+	nh := mustGetNodeHandle(path)
+	start := time.Now()
+	val, err := strconv.ParseUint(value, 10, 64)
+	if err != nil {
+		fmt.Println("Cannot parse %v as integer", value)
+	}
+	fmt.Println("cupid-client: ", val)
+	err = nh.Nop(val)
+	if err != nil {
+		log.Fatalf("nop error:", err)
+
+	}
+	fmt.Println(time.Since(start))
+	return true
+}
+
 func handleLock(args []string) bool {
 	if maybePrintHelp(parseGet(args)) {
 		return true
@@ -242,6 +277,8 @@ func runCmd(args []string) bool {
 	case "wait":
 		time.Sleep(10 * time.Second)
 		return true
+	case "nop":
+		return handleNop(args)
 	case "exit":
 		return false
 	default:
@@ -311,7 +348,7 @@ func printEvents(path string, cas server.NodeContentAndStat) {
 func main() {
 	args := parseArgs()
 	fmt.Println(addrs)
-	tmp_cl, err := client.NewRaft(addrs, 5)
+	tmp_cl, err := client.NewRaft(addrs, 5*time.Second)
 
 	if err != nil {
 		log.Fatalf("error initialiing client %v\n", err)

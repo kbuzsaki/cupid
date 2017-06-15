@@ -16,6 +16,7 @@ const (
 	releaseProposalType
 	prepareSetContentProposalType
 	finalizeSetContentProposalType
+	nopProposalType
 )
 
 type Proposal struct {
@@ -28,6 +29,7 @@ type Proposal struct {
 	*ReleaseProposal
 	*PrepareSetContentProposal
 	*FinalizeSetContentProposal
+	*NopProposal
 }
 
 func (p *Proposal) Get() interface{} {
@@ -48,6 +50,8 @@ func (p *Proposal) Get() interface{} {
 		return *p.PrepareSetContentProposal
 	case finalizeSetContentProposalType:
 		return *p.FinalizeSetContentProposal
+	case nopProposalType:
+		return *p.NopProposal
 	default:
 		return nil
 	}
@@ -131,6 +135,15 @@ func (fcp *FinalizeSetContentProposal) Wrap() Proposal {
 	return Proposal{Type: finalizeSetContentProposalType, FinalizeSetContentProposal: fcp}
 }
 
+type NopProposal struct {
+	ID      uint64
+	Garbage int
+}
+
+func (np *NopProposal) Wrap() Proposal {
+	return Proposal{Type: nopProposalType, NopProposal: np}
+}
+
 func Encode(proposal Proposal) string {
 	var buf bytes.Buffer
 	if err := gob.NewEncoder(&buf).Encode(&proposal); err != nil {
@@ -161,6 +174,7 @@ func NewRaftFSM(proposeC chan<- string, committedC <-chan *string, delegate FSM)
 		releaseAcks:            NewAtomicMap(),
 		setContentAcks:         NewAtomicMap(),
 		finalizeSetContentAcks: NewAtomicMap(),
+		nopProposalAcks:        NewAtomicMap(),
 	}
 
 	go fsm.readFromLog()
@@ -183,6 +197,7 @@ type raftFSMImpl struct {
 	releaseAcks            AtomicMap
 	setContentAcks         AtomicMap
 	finalizeSetContentAcks AtomicMap
+	nopProposalAcks        AtomicMap
 }
 
 func (fsm *raftFSMImpl) nextId() uint64 {
@@ -305,6 +320,19 @@ func (fsm *raftFSMImpl) FinalizeSetContent(path string) {
 	<-ac
 }
 
+func (fsm *raftFSMImpl) Nop(garbage int) {
+	id := fsm.nextId()
+
+	ac := make(chan bool)
+	fsm.nopProposalAcks.Put(id, ac)
+
+	proposal := NopProposal{ID: id, Garbage: garbage}
+
+	fsm.proposeC <- Encode(proposal.Wrap())
+
+	<-ac
+}
+
 func (fsm *raftFSMImpl) readFromLog() {
 	for operation := range fsm.committedC {
 		if operation == nil {
@@ -352,6 +380,11 @@ func (fsm *raftFSMImpl) readFromLog() {
 		case FinalizeSetContentProposal:
 			fsm.delegate.FinalizeSetContent(p.Path)
 			if ch := fsm.finalizeSetContentAcks.Get(p.ID); ch != nil {
+				ch.(chan bool) <- true
+			}
+		case NopProposal:
+			fsm.delegate.Nop(p.Garbage)
+			if ch := fsm.nopProposalAcks.Get(p.ID); ch != nil {
 				ch.(chan bool) <- true
 			}
 		default:

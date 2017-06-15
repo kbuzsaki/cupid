@@ -30,4 +30,5 @@ type NodeHandle interface {
 	Delete() error
 	Path() string
 	Register(cb SubscriberCallback)
+	Nop(numOps uint64) error
 }

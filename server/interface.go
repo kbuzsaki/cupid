@@ -16,6 +16,7 @@ type Server interface {
 
 	GetContentAndStat(node NodeDescriptor) (NodeContentAndStat, error)
 	SetContent(node NodeDescriptor, content string, generation uint64) (bool, error)
+	Nop(numOps uint64) error
 }
 
 type SessionDescriptor struct {
