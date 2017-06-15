@@ -15,6 +15,7 @@ ADDRESSES = [
 def launch_publisher_proc(addresses, topic, numGoRoutines, publishers, stdout=DEVNULL):
     addrstr = ",".join(addresses)
     args = [CLIENT, "-addrs", addrstr, "-publish", "-topic", topic, "-numGoRoutines", str(numGoRoutines), "-pubs", str(publishers)]
+    print(args)
     daemon = Popen(args, stdout=PIPE)
     if daemon.poll():
         raise Exception("failed to init publisher")
@@ -23,6 +24,7 @@ def launch_publisher_proc(addresses, topic, numGoRoutines, publishers, stdout=DE
 def launch_subscriber_proc(addresses, topic, subscribers, stdout=DEVNULL):
     addrstr = ",".join(addresses)
     args = [CLIENT, "-addrs", addrstr, "-topic", topic, "-subs", str(subscribers)]
+    print(args)
     daemon = Popen(args, stdout=stdout, stderr=DEVNULL)
     if daemon.poll():
         raise Exception("failed to init publisher")
@@ -65,6 +67,7 @@ def do_keep_alive_perf_test(subscribers, topic, procs):
 def launch_locker(numGoRoutines, iterations, addresses, topic, stdout=DEVNULL):
     addrstr = ",".join(addresses)
     args = [CLIENT, "-locker", "-addrs", addrstr, "-topic", topic, "-numGoRoutines", str(numGoRoutines), "-iterations", str(iterations)]
+    print(args)
     daemon = Popen(args, stdout=stdout, stderr=DEVNULL)
     if daemon.poll():
         raise Exception("failed to init locker")
@@ -91,6 +94,7 @@ def do_nop_perf_test(topic, numOps, iterations, goroutines, procs):
 def launch_noper(addresses, topic, numOps, iterations, goroutines, stdout=DEVNULL):
     addrstr = ",".join(addresses)
     args = [CLIENT, "-nop", "-addrs", addrstr, "-topic", topic, "-numOps", str(numOps), "-numGoRoutines", str(goroutines), "-iterations", str(iterations)]
+    print(args)
     daemon = Popen(args, stdout=stdout, stderr=DEVNULL)
     if daemon.poll():
         raise Exception("failed to init noper")
@@ -107,6 +111,7 @@ def print_stats(measurements):
     print("median :", toMilli(statistics.median(measurements)))
     print("max    :", toMilli(max(measurements)))
     print("min    :", toMilli(min(measurements)))
+    print("total  :", toMilli(sum(measurements)))
 
 def maybe_help(target_len, actual_len):
     should_print = target_len is not actual_len
