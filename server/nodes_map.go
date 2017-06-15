@@ -23,7 +23,7 @@ func (nim *nodeInfoMap) CreateNode(path string) *nodeInfo {
 	defer nim.lock.Unlock()
 
 	if _, ok := nim.data[path]; !ok {
-		nim.data[path] = &nodeInfo{path: path}
+		nim.data[path] = &nodeInfo{path: path, finalized: true}
 	}
 
 	return nim.data[path]
