@@ -3,6 +3,7 @@ from subprocess import Popen, PIPE, DEVNULL
 import statistics
 import sys
 import time
+import numpy
 
 CLIENT = "perf-client"
 
@@ -111,6 +112,8 @@ def print_stats(measurements):
     print("median :", toMilli(statistics.median(measurements)))
     print("max    :", toMilli(max(measurements)))
     print("min    :", toMilli(min(measurements)))
+    print("90th p :", toMilli(numpy.percentile(measurements, 90)))
+    print("99th p :", toMilli(numpy.percentile(measurements, 99)))
     print("total  :", toMilli(sum(measurements)))
 
 def maybe_help(target_len, actual_len):
