@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/coreos/etcd/raft/raftpb"
+	"github.com/coreos/pkg/capnslog"
 	"github.com/kbuzsaki/cupid/rpcclient"
 	"github.com/kbuzsaki/cupid/server"
 )
@@ -18,9 +19,12 @@ func main() {
 	id := flag.Int("id", 1, "node ID")
 	cupidport := flag.Int("port", 9121, "cupid rpc server port")
 	join := flag.Bool("join", false, "join an existing cluster")
+	verbose := flag.Bool("verbose", false, "enable verbose logging")
 	flag.Parse()
 
-	log.Println("*******something!!")
+	if !*verbose {
+		capnslog.SetGlobalLogLevel(capnslog.ERROR)
+	}
 
 	go http.ListenAndServe(fmt.Sprintf("localhost:%d", *cupidport+1), nil)
 
