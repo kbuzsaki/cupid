@@ -11,6 +11,8 @@ ADDRESSES = [
     "127.0.0.1:12380",
     "127.0.0.1:22380",
     "127.0.0.1:32380",
+    "127.0.0.1:42380",
+    "127.0.0.1:52380"
 ]
 
 def launch_publisher_proc(addresses, topic, numGoRoutines, publishers, stdout=DEVNULL):
