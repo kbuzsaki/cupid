@@ -19,3 +19,12 @@ mocks:
 
 fresh:
 	rm -rf raftexample-*
+
+launch1: fresh all
+	./launch.sh 1
+
+launch3: fresh all
+	./launch.sh 3
+
+launch5: fresh all
+	./launch.sh 5
