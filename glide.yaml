@@ -2,3 +2,5 @@ package: github.com/kbuzsaki/cupid
 import:
 - package: github.com/stretchr/testify
   version: ^1.1.4
+- package: github.com/coreos/etcd/raft
+  version: e42d5174efc275de61165f48cab1a536d2f4faff
