@@ -155,7 +155,7 @@ def maybe_help(target_len, actual_len):
     return should_print
 
 def print_help():
-    print("python3 perf_test.py -locker     [topic] [numGoRoutines] [iterations] [procs]")
+    print("python3 perf_test.py -locker     [topic1,topic2,topic3...] [numGoRoutines] [iterations] [procs]")
     print("python3 perf_test.py -pubsub     [topic] [numMessages] [numSubscribers] [numPublishers] [sprocs] [pprocs]")
     print("python3 perf_test.py -keepalive  [topic] [numGoRoutines] [procs]")
     print("python3 perf_test.py -nop        [topic] [numOps] [goroutines] [iterations] [procs]")
