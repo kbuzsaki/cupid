@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/kbuzsaki/cupid/client"
+	"github.com/kbuzsaki/cupid/rpcclient"
 	"github.com/kbuzsaki/cupid/server"
 )
 
@@ -193,13 +194,45 @@ func launchNopers(topic string, numOps uint64, count, iterations int) {
 	finished.Wait()
 }
 
+func launchFailover(topic string, id int) {
+	keepAliveDelay := 10 * time.Millisecond
+	log.Println("opening rpc")
+	s := rpcclient.New(addrs[0], keepAliveDelay)
+	log.Println("opening session")
+	sd, err := s.OpenSession()
+	if err != nil {
+		log.Fatal("error opening session:", err)
+	}
+
+	log.Println("opening node")
+	nd, err := s.Open(sd, topic, true, server.EventsConfig{})
+	if err != nil {
+		log.Fatal("error opening node:", err)
+	}
+
+	s = rpcclient.New(addrs[id], keepAliveDelay)
+	for {
+		//log.Println("pinging:", addrs[0])
+		_, err := s.GetContentAndStat(nd)
+		if err != nil {
+			fmt.Println(time.Now(), ":", err)
+		} else {
+			fmt.Println(time.Now(), ":", "success!")
+		}
+
+		time.Sleep(100 * time.Millisecond)
+	}
+}
+
 func main() {
 	addrstrp := flag.String("addrs", "", "the server address")
 
 	publisherp := flag.Bool("publish", false, "whether the client will publish")
 	lockp := flag.Bool("locker", false, "whether the client will run locker benchmark")
 	nopp := flag.Bool("nop", false, "whether the client will run nops")
+	failoverp := flag.Bool("failover", false, "whether the client will do a failover benchmark")
 
+	idp := flag.Int("id", 0, "index to ping")
 	pubsp := flag.Int("pubs", 0, "Number of concurrent publishers")
 	subsp := flag.Int("subs", 0, "Number of concurrent subscribers")
 	topicp := flag.String("topic", "", "the topic to publish or subscribe to")
@@ -211,11 +244,13 @@ func main() {
 
 	addrs = strings.Split(*addrstrp, ",")
 
-	cl, err := client.NewRaft(addrs, 5*time.Second)
-	if err != nil {
-		log.Fatal("error opening client:", err)
-	}
-	defer cl.Close()
+	/*
+		cl, err := client.NewRaft(addrs, 5*time.Second)
+		if err != nil {
+			log.Fatal("error opening client:", err)
+		}
+		defer cl.Close()
+	*/
 
 	if *publisherp {
 		launchSubscribers(*topicp, *subsp)
@@ -224,6 +259,8 @@ func main() {
 		launchLockers(*topicp, *numGoRoutinesP, *iterationsp)
 	} else if *nopp {
 		launchNopers(*topicp, *numOpsp, *numGoRoutinesP, *iterationsp)
+	} else if *failoverp {
+		launchFailover(*topicp, *idp)
 	} else { //keep alive test
 		launchSubscribers(*topicp, *subsp)
 	}
