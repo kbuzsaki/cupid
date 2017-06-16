@@ -42,15 +42,21 @@ def launch_daemons(launcher, numGoRoutines, *args, **kwargs):
 def do_simple_perf_test(publishers, subscribers, topic, messages, sprocs, pprocs):
     subscribe_daemons = launch_daemons(launch_subscriber_proc, sprocs, ADDRESSES, topic, subscribers)
 
-    start = datetime.now()
+    # start = datetime.now()
     publish_daemons = launch_daemons(launch_publisher_proc, pprocs, ADDRESSES, topic, messages, publishers)
 
-    for pd in publish_daemons:
-        pd.wait()
-    end = datetime.now()
+    for sd in subscribe_daemons:
+        sd.wait()
 
-    delta = end - start
-    print("time:", delta)
+    all_measurements = []
+    for pd in publish_daemons:
+        stdout, stderr = pd.communicate()
+        output = stdout.decode("utf8").split("\n")[:-1]
+        all_measurements.extend(output)
+
+    all_measurements = [float(x) for x in all_measurements]
+    print("mean   :", toMilli(statistics.mean(all_measurements)))
+    print("median :", toMilli(statistics.median(all_measurements)))
 
 def do_keep_alive_perf_test(subscribers, topic, procs):
     subscribe_daemons = launch_daemons(launch_subscriber_proc, procs, ADDRESSES, topic, subscribers, stdout=PIPE)
