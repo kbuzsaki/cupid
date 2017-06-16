@@ -39,11 +39,35 @@ def launch_daemons(launcher, numGoRoutines, *args, **kwargs):
         daemons.append(launcher(*args, **kwargs))
     return daemons
 
-def do_simple_perf_test(publishers, subscribers, topic, messages, sprocs, pprocs):
-    subscribe_daemons = launch_daemons(launch_subscriber_proc, sprocs, ADDRESSES, topic, subscribers)
+#takes in a csv and the number of procs and extends/shrinks topics that size
+def get_topics_list(topics_str, procs):
+    topic_list = topics_str.split(",")
+    topic_arg = []
+    for i in range(procs):
+        index = i % len(topic_list)
+        topic = topic_list[index]
+        topic_arg.append(topic)
 
-    # start = datetime.now()
-    publish_daemons = launch_daemons(launch_publisher_proc, pprocs, ADDRESSES, topic, messages, publishers)
+    return topic_arg
+
+def do_simple_perf_test(publishers, subscribers, topics_str, messages, sprocs, pprocs):
+
+
+    # subscribe_daemons = launch_daemons(launch_subscriber_proc, sprocs, ADDRESSES, topic, subscribers)
+
+    subscribe_daemons = []
+    topics_list = get_topics_list(topics_str, sprocs)
+    for topic in topics_list:
+        sd = launch_daemons(launch_subscriber_proc, 1, ADDRESSES, topic, subscribers)[0]
+        subscribe_daemons.append(sd)
+
+    topics_list = get_topics_list(topics_str, pprocs)
+    publish_daemons = []
+    for topic in topics_list:
+        pd = launch_daemons(launch_publisher_proc, 1, ADDRESSES, topic, messages, publishers)[0]
+        publish_daemons.append(pd)
+
+    # publish_daemons = launch_daemons(launch_publisher_proc, pprocs, ADDRESSES, topic, messages, publishers)
 
     for sd in subscribe_daemons:
         sd.wait()
@@ -160,13 +184,13 @@ if __name__ == "__main__":
     if cmd == "-pubsub":
         if maybe_help(8, len(sys.argv)):
             exit()
-        topic = sys.argv[2]
+        topics = sys.argv[2]
         messages = int(sys.argv[3])
         subscribers = int(sys.argv[4])
         publishers = int(sys.argv[5])
         sprocs = int(sys.argv[6])
         pprocs = int(sys.argv[7])
-        do_simple_perf_test(publishers, subscribers, topic, messages, sprocs, pprocs)
+        do_simple_perf_test(publishers, subscribers, topics, messages, sprocs, pprocs)
 
     if cmd == "-keepalive":
         if maybe_help(5, len(sys.argv)):
